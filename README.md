@@ -70,13 +70,16 @@ This project is a modern web application that enables online delivery of occupat
    image.png
 
 ## 💻 Usage
+![image](https://github.com/user-attachments/assets/6481dcb0-a8f3-4642-86d7-5a4f31f45932)
+
 
 1. Create an admin account
 2. Upload courses and videos through the admin panel
 3. Create user accounts
 4. Users complete their training
 5. View progress reports from the admin panel
-image.png
+![image](https://github.com/user-attachments/assets/78117b34-7ed5-43e5-bb58-cb7adf6d3515)
+
 
 ## 🛠️ Technologies
 
