@@ -67,6 +67,8 @@ This project is a modern web application that enables online delivery of occupat
    python app.py
    ```
 
+   image.png
+
 ## 💻 Usage
 
 1. Create an admin account
@@ -74,6 +76,7 @@ This project is a modern web application that enables online delivery of occupat
 3. Create user accounts
 4. Users complete their training
 5. View progress reports from the admin panel
+image.png
 
 ## 🛠️ Technologies
 
