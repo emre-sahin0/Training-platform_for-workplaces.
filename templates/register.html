@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">Kayıt Ol</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="registerForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">E-posta</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Şifre</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm" class="form-label">Şifre (Tekrar)</label>
+                        <input type="password" class="form-control" id="confirm" name="confirm" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="first_name" class="form-label">İsim</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="last_name" class="form-label">Soyisim</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_admin" name="is_admin">
+                        <label class="form-check-label" for="is_admin">Admin olarak kayıt ol</label>
+                    </div>
+                    <div class="mb-3 admin-password-field" style="display: none;">
+                        <label for="admin_password" class="form-label">Admin Kayıt Şifresi</label>
+                        <input type="password" class="form-control" id="admin_password" name="admin_password">
+                        <div class="form-text">Admin olarak kayıt olmak için özel şifre gereklidir.</div>
+                        <div class="form-text text-danger" id="adminPasswordError" style="display: none;">
+                            Geçersiz admin şifresi!
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Kayıt Ol</button>
+                    </div>
+                </form>
+                <div class="mt-3 text-center">
+                    <a href="{{ url_for('login') }}">Zaten hesabınız var mı? Giriş yapın.</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('is_admin').addEventListener('change', function() {
+    var adminPasswordField = document.querySelector('.admin-password-field');
+    var adminPasswordInput = document.getElementById('admin_password');
+    adminPasswordField.style.display = this.checked ? 'block' : 'none';
+    if (!this.checked) {
+        adminPasswordInput.value = '';
+    }
+});
+
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    var isAdmin = document.getElementById('is_admin').checked;
+    var adminPassword = document.getElementById('admin_password').value;
+    var adminPasswordError = document.getElementById('adminPasswordError');
+    
+    if (isAdmin && !adminPassword) {
+        e.preventDefault();
+        adminPasswordError.style.display = 'block';
+    } else {
+        adminPasswordError.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
+
+</body>
+</html> 

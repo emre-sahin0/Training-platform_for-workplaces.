@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Yeni Kurs Oluştur</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Kurs Başlığı</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Kurs Açıklaması</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size:1.1rem;">Eğitimi Alacak Kullanıcılar</label>
+                        <div class="list-group user-select-list shadow rounded-4" style="max-height: 250px; overflow-y: auto;">
+                            {% for user in users if not user.is_admin %}
+                            <label class="list-group-item d-flex align-items-center gap-2 user-select-item rounded-3 mb-2" style="cursor:pointer; border: none;">
+                                <input class="form-check-input me-2 big-checkbox" type="checkbox" name="assigned_users" value="{{ user.id }}" onchange="this.parentElement.classList.toggle('selected', this.checked)">
+                                <span class="user-info fw-bold" style="font-size:1.05rem;">
+                                    <i class="bi bi-person-circle me-1"></i>{{ user.first_name }} {{ user.last_name }}
+                                    <span class="badge bg-light text-dark ms-2">{{ user.username }}</span>
+                                </span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <small class="form-text text-muted">Birden fazla kullanıcı seçebilirsiniz.</small>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Video(lar) Ekle</label>
+                        <div id="videoInputs">
+                            <div class="row g-2 mb-2 video-input-row">
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control" name="video_titles[]" placeholder="Video Başlığı" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="file" class="form-control" name="video_files[]" accept="video/*" required>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-info btn-sm mt-2" onclick="addVideoInput()">+ Video Ekle</button>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Test Ekle</label>
+                        <ul class="nav nav-tabs mb-2" id="testTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="classic-tab" data-bs-toggle="tab" data-bs-target="#classicTest" type="button" role="tab">Klasik Test</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="pdf-tab" data-bs-toggle="tab" data-bs-target="#pdfTest" type="button" role="tab">PDF Test</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="classicTest" role="tabpanel">
+                                <div id="questionsArea">
+                                    <div class="card mb-3 question-card">
+                                        <div class="card-body">
+                                            <div class="mb-2">
+                                                <label class="form-label">Soru</label>
+                                                <input type="text" class="form-control" name="question_texts[]" required>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6 mb-2">
+                                                    <input type="text" class="form-control mb-1" name="option1[]" placeholder="A şıkkı" required>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="correct_0" value="0" required>
+                                                        <label class="form-check-label">Doğru Şık</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6 mb-2">
+                                                    <input type="text" class="form-control mb-1" name="option2[]" placeholder="B şıkkı" required>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="correct_0" value="1">
+                                                        <label class="form-check-label">Doğru Şık</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary mb-3" id="addQuestionBtn">+ Soru Ekle</button>
+                            </div>
+                            <div class="tab-pane fade" id="pdfTest" role="tabpanel">
+                                <div class="mb-3">
+                                    <label class="form-label">Test PDF Dosyası</label>
+                                    <input type="file" class="form-control" name="test_pdf" accept="application/pdf">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Soru Sayısı</label>
+                                    <input type="number" class="form-control" name="pdf_question_count" min="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
+                                    <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Kursu Oluştur</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.user-select-list {
+    background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+    padding: 12px 8px;
+}
+.user-select-item {
+    background: rgba(255,255,255,0.6);
+    border: 1.5px solid #e0eafc;
+    margin-bottom: 8px;
+    transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+    box-shadow: 0 2px 8px 0 rgba(79,140,255,0.04);
+}
+.user-select-item:hover {
+    background: linear-gradient(90deg, #a1c4fd 0%, #c2e9fb 100%);
+    box-shadow: 0 2px 12px 0 rgba(79,140,255,0.12);
+}
+.user-select-item.selected {
+    background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%) !important;
+    color: #fff !important;
+    border-color: #4f8cff;
+}
+.user-select-item.selected .user-info {
+    color: #fff !important;
+}
+.user-select-item.selected .badge {
+    background: #fff !important;
+    color: #4f8cff !important;
+    font-weight: bold;
+}
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.big-checkbox {
+    width: 1.3em;
+    height: 1.3em;
+    border-radius: 50%;
+    border: 2px solid #4f8cff;
+    accent-color: #4f8cff;
+    margin-right: 10px;
+}
+</style>
+
+{% block scripts %}
+<script>
+function addVideoInput() {
+    const container = document.getElementById('videoInputs');
+    const idx = container.querySelectorAll('.video-input-row').length;
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 video-input-row';
+    row.innerHTML = `
+        <div class="col-md-6">
+            <input type="text" class="form-control" name="video_titles[]" placeholder="Video Başlığı" required>
+        </div>
+        <div class="col-md-6">
+            <input type="file" class="form-control" name="video_files[]" accept="video/*" required>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
+// Dinamik soru ekleme
+let questionIndex = 1;
+document.getElementById('addQuestionBtn').onclick = function() {
+    const area = document.getElementById('questionsArea');
+    let html = `<div class="card mb-3 question-card"><div class="card-body">
+        <div class="mb-2"><label class="form-label">Soru</label>
+        <input type="text" class="form-control" name="question_texts[]" required></div>
+        <div class="row">
+            <div class="col-6 mb-2">
+                <input type="text" class="form-control mb-1" name="option1[]" placeholder="A şıkkı" required>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="correct_${questionIndex}" value="0" required>
+                    <label class="form-check-label">Doğru Şık</label>
+                </div>
+            </div>
+            <div class="col-6 mb-2">
+                <input type="text" class="form-control mb-1" name="option2[]" placeholder="B şıkkı" required>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="correct_${questionIndex}" value="1">
+                    <label class="form-check-label">Doğru Şık</label>
+                </div>
+            </div>
+        </div>
+    </div></div>`;
+    area.insertAdjacentHTML('beforeend', html);
+    questionIndex++;
+};
+</script>
+{% endblock %}
+{% endblock %} 

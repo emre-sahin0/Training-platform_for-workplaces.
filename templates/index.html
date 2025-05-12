@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <h1 class="display-4 mb-4">İş Sağlığı ve Güvenliği Eğitim Platformu</h1>
+        <p class="lead mb-4">
+            İş sağlığı ve güvenliği eğitimlerinizi online olarak tamamlayın.
+            Video eğitimler ve testler ile bilgilerinizi pekiştirin.
+        </p>
+        {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Giriş Yap</a>
+        {% else %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">Panele Git</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="card-title">Video Eğitimler</h3>
+                <p class="card-text">
+                    Uzman eğitmenler tarafından hazırlanan video eğitimler ile
+                    iş sağlığı ve güvenliği konularında kendinizi geliştirin.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="card-title">Online Testler</h3>
+                <p class="card-text">
+                    Her eğitimin sonunda bilgilerinizi test edin ve
+                    başarı durumunuzu takip edin.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="card-title">İlerleme Takibi</h3>
+                <p class="card-text">
+                    Eğitimlerinizdeki ilerlemenizi takip edin ve
+                    tamamladığınız eğitimleri görüntüleyin.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

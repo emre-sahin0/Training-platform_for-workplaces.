@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">{{ video.title }}</h3>
+                <video id="videoPlayer" class="w-100" controls controlsList="nodownload" preload="auto">
+                    <source src="{{ url_for('static', filename='uploads/' + video.video_path) }}" type="video/mp4">
+                    Tarayıcınız video oynatmayı desteklemiyor.
+                </video>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Eğitim Durumu</h5>
+                {% if progress and progress.completed %}
+                    <div class="alert alert-success">
+                        Bu video tamamlandı!
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        Bu video henüz tamamlanmadı.
+                    </div>
+                {% endif %}
+                
+                {% if video.order < video.course.videos|length %}
+                    <a href="{{ url_for('video', video_id=video.course.videos[video.order].id) }}" 
+                       id="nextVideoBtn"
+                       class="btn btn-primary w-100 {% if not progress or not progress.completed %}disabled{% endif %}">
+                        Sonraki Video
+                    </a>
+                {% elif video.order == video.course.videos|length %}
+                    <button id="finishTrainingBtn" class="btn btn-success w-100 d-none">Eğitimi Bitir</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Seek bar ve ileri/geri sarma butonlarını tamamen gizle, süre ve oynat/durdur görünsün */
+video::-webkit-media-controls-timeline,
+video::-webkit-media-controls-seek-back-button,
+video::-webkit-media-controls-seek-forward-button {
+    display: none !important;
+}
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-volume-slider,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-fullscreen-button {
+    display: block !important;
+}
+</style>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const video = document.getElementById('videoPlayer');
+    const nextButton = document.getElementById('nextVideoBtn');
+    const finishBtn = document.getElementById('finishTrainingBtn');
+    let lastTime = 0;
+    let allowSeek = true;
+
+    // Sadece ileri sarmayı engelle, geri sarmaya izin ver
+    video.addEventListener('timeupdate', function() {
+        if (!video.seeking) {
+            lastTime = video.currentTime;
+        }
+    });
+    video.addEventListener('seeking', function() {
+        if (video.currentTime > lastTime + 0.5) {
+            allowSeek = false;
+            video.currentTime = lastTime;
+            setTimeout(() => {
+                if (video.paused) video.play();
+            }, 100);
+        } else {
+            allowSeek = true;
+        }
+    });
+    video.addEventListener('seeked', function() {
+        if (!allowSeek) {
+            allowSeek = true;
+        }
+    });
+
+    // Video bittiğinde
+    video.addEventListener('ended', function() {
+        fetch('/video/{{ video.id }}/complete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (nextButton) {
+                    nextButton.classList.remove('disabled');
+                }
+                if (finishBtn) {
+                    finishBtn.classList.remove('d-none');
+                }
+            }
+        });
+    });
+
+    // Eğitimi Bitir butonuna tıklanınca ana panele yönlendir
+    if (finishBtn) {
+        finishBtn.addEventListener('click', function() {
+            window.location.href = '/dashboard';
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %} 

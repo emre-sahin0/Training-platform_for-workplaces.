@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Kursu Düzenle</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Kurs Başlığı</label>
+                        <input type="text" class="form-control" id="title" name="title" value="{{ course.title }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Kurs Açıklaması</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" required>{{ course.description }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="assigned_users" class="form-label">Eğitimi Alacak Kullanıcılar</label>
+                        <select class="form-select" id="assigned_users" name="assigned_users" multiple required>
+                            {% for user in users if not user.is_admin %}
+                                <option value="{{ user.id }}" {% if user in course.assigned_users %}selected{% endif %}>{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Birden fazla kullanıcı seçmek için Ctrl (veya Cmd) tuşunu kullanabilirsiniz.</small>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">Kaydet</button>
+                        <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-secondary mt-2">İptal</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

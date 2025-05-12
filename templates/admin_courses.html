@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Kurslar</h2>
+<a href="{{ url_for('new_course') }}" class="btn btn-primary mb-3">Yeni Kurs Ekle</a>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Kurs Adı</th>
+            <th>Açıklama</th>
+            <th>Yönet</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for course in courses %}
+        <tr>
+            <td>{{ course.title }}</td>
+            <td>{{ course.description }}</td>
+            <td>
+                <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-info btn-sm">Kursu Yönet</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %} 

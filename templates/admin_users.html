@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-hero py-4 px-3 mb-4 rounded-4 text-white" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%);">
+    <h2 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i>Kullanıcı Yönetimi</h2>
+</div>
+<div class="table-responsive">
+<table class="table table-bordered align-middle shadow-sm bg-white rounded-4">
+    <thead class="table-primary">
+        <tr>
+            <th>ID</th>
+            <th>Kullanıcı Adı</th>
+            <th>Ad Soyad</th>
+            <th>E-posta</th>
+            <th>Admin mi?</th>
+            <th>İşlemler</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td data-label="ID">{{ user.id }}</td>
+            <td data-label="Kullanıcı Adı">{{ user.username }}</td>
+            <td data-label="Ad Soyad">{{ user.first_name }} {{ user.last_name }}</td>
+            <td data-label="E-posta">{{ user.email }}</td>
+            <td data-label="Admin mi?">{% if user.is_admin %}<span class="badge bg-success">Evet</span>{% else %}<span class="badge bg-secondary">Hayır</span>{% endif %}</td>
+            <td data-label="İşlemler">
+                <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm">Düzenle</a>
+                <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?');">
+                    <button type="submit" class="btn btn-danger btn-sm ms-1">Sil</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %} 

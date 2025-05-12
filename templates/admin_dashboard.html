@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-hero py-4 px-3 mb-4 rounded-4 text-white" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%);">
+    <h2 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>Admin Paneli</h2>
+    <div class="d-flex flex-wrap align-items-center gap-3">
+        <form method="get" action="{{ url_for('dashboard') }}" class="d-flex align-items-center gap-2">
+            <label for="courseSelect" class="fw-semibold mb-0">Eğitim Seç:</label>
+            <select class="form-select form-select-sm w-auto" id="courseSelect" name="course_id" onchange="this.form.submit()">
+                {% for course in courses %}
+                    <option value="{{ course.id }}" {% if selected_course and course.id == selected_course.id %}selected{% endif %}>{{ course.title }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a href="{{ url_for('new_course') }}" class="btn btn-warning btn-sm fw-bold shadow-sm">+ Yeni Kurs</a>
+        <a href="{{ url_for('generate_report') }}" class="btn btn-success btn-sm fw-bold shadow-sm">Rapor Oluştur</a>
+    </div>
+</div>
+
+{% if selected_course %}
+<h4 class="fw-bold mb-3" style="color:#4f8cff"><i class="bi bi-people-fill me-2"></i>{{ selected_course.title }} - Katılımcı Durumları</h4>
+<div class="table-responsive">
+<table class="table table-bordered align-middle shadow-sm bg-white rounded-4">
+    <thead class="table-primary">
+        <tr>
+            <th>Kullanıcı Adı</th>
+            <th>E-posta</th>
+            <th>Tamamlanan Video</th>
+            <th>Toplam Video</th>
+            <th>İlerleme (%)</th>
+            <th>Test Sonucu</th>
+            <th>Durum</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in user_progress %}
+        <tr>
+            <td data-label="Kullanıcı Adı">{{ row.user.first_name }} {{ row.user.last_name }}</td>
+            <td data-label="E-posta">{{ row.user.email }}</td>
+            <td data-label="Tamamlanan Video">{{ row.completed_videos }}</td>
+            <td data-label="Toplam Video">{{ row.total_videos }}</td>
+            <td data-label="İlerleme (%)"><span class="badge bg-info text-dark">{{ row.percent }}%</span></td>
+            <td data-label="Test Sonucu">{% if row.test_score is not none %}<span class="badge bg-success">{{ row.test_score }}</span>{% else %}-{% endif %}</td>
+            <td data-label="Durum">
+                {% if row.percent == 100 %}
+                    <span class="badge bg-success">Tamamlandı</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">Devam Ediyor</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %} 

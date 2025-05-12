@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İş Sağlığı ve Güvenliği Eğitim Platformu</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body style="min-height:100vh; background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);">
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-lg" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%); border-radius:0 0 2rem 2rem;">
+        <div class="container">
+            <a class="navbar-brand fw-bold" style="font-size:1.5rem; letter-spacing:1px; text-shadow:0 2px 8px #6a82fb99;" href="{{ url_for('index') }}">İSG Eğitim</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto gap-1">
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link nav-glass" href="{{ url_for('dashboard') }}">Panel</a>
+                        </li>
+                        {% if current_user.is_admin %}
+                            <li class="nav-item">
+                                <a class="nav-link nav-glass" href="{{ url_for('new_course') }}">Yeni Kurs</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link nav-glass" href="{{ url_for('generate_report') }}">Rapor</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link nav-glass" href="{{ url_for('admin_users') }}">Kullanıcılar</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link nav-glass" href="{{ url_for('admin_courses') }}">Kurslar</a>
+                            </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link nav-glass" href="{{ url_for('profile') }}">Profilim</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link nav-glass" href="{{ url_for('logout') }}">Çıkış</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link nav-glass" href="{{ url_for('login') }}">Giriş</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link nav-glass" href="{{ url_for('register') }}">Kayıt Ol</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4 main-glass p-4 rounded-4 shadow-lg">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-glass">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+    <style>
+    body {
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
+    }
+    .main-glass {
+        background: rgba(255,255,255,0.7);
+        box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
+        backdrop-filter: blur(8px);
+        border-radius: 2rem;
+        border: 1.5px solid #e0eafc;
+    }
+    .nav-glass {
+        border-radius: 1rem;
+        padding: 0.5rem 1.2rem;
+        margin: 0 0.2rem;
+        background: rgba(255,255,255,0.10);
+        transition: background 0.2s, color 0.2s;
+        font-weight: 500;
+    }
+    .nav-glass:hover, .nav-glass.active, .navbar-nav .nav-link.active {
+        background: linear-gradient(90deg, #a1c4fd 0%, #c2e9fb 100%);
+        color: #4f8cff !important;
+        box-shadow: 0 2px 8px 0 #4f8cff22;
+    }
+    .alert-glass {
+        background: linear-gradient(90deg, #fbc2eb 0%, #a6c1ee 100%);
+        color: #222;
+        border: none;
+        border-radius: 1rem;
+        font-weight: 500;
+        box-shadow: 0 2px 8px 0 #a6c1ee33;
+    }
+    </style>
+</body>
+</html> 
