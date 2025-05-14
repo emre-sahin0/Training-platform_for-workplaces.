@@ -117,18 +117,19 @@
                     <div id="questionsArea">
                         {% if course.tests|length > 0 %}
                             {% for question in course.tests[0].questions %}
+                                {% set q_idx = loop.index0 %}
                                 <div class="card mb-3">
                                     <div class="card-body">
                                         <div class="mb-2">
                                             <label class="form-label">Soru</label>
-                                            <input type="text" class="form-control" name="question_{{ loop.index0 }}" value="{{ question.text }}" required>
+                                            <input type="text" class="form-control" name="question_{{ q_idx }}" value="{{ question.text }}" required>
                                         </div>
                                         <div class="row">
                                             {% for option in question.options %}
                                             <div class="col-6 mb-2">
-                                                <input type="text" class="form-control mb-1" name="option_{{ loop.parent.index0 }}_{{ loop.index0 }}" value="{{ option.text }}" required>
+                                                <input type="text" class="form-control mb-1" name="option_{{ q_idx }}_{{ loop.index0 }}" value="{{ option.text }}" required>
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="correct_{{ loop.parent.index0 }}" value="{{ loop.index0 }}" {% if option.is_correct %}checked{% endif %}>
+                                                    <input class="form-check-input" type="radio" name="correct_{{ q_idx }}" value="{{ loop.index0 }}" {% if option.is_correct %}checked{% endif %}>
                                                     <label class="form-check-label">Doğru Şık</label>
                                                 </div>
                                             </div>
@@ -198,7 +199,7 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let questionCount = {{ course.tests[0].questions|length if course.tests|length > 0 else 0 }};
+    let questionCount = Number("{{ course.tests[0].questions|length if course.tests|length > 0 else 0 }}");
     var addBtn = document.getElementById('addQuestionBtn');
     if (addBtn) {
         addBtn.addEventListener('click', function() {

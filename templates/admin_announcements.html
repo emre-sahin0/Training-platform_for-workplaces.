@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Duyurular</h2>
+    <div class="card mb-4 shadow-sm border-0 rounded-4">
+        <div class="card-header bg-primary text-white rounded-top-4">
+            <h5 class="mb-0">Yeni Duyuru Ekle</h5>
+        </div>
+        <div class="card-body bg-light">
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label">Başlık</label>
+                    <input type="text" class="form-control" name="title" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">İçerik</label>
+                    <textarea class="form-control" name="content" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">Duyuru Ekle</button>
+            </form>
+        </div>
+    </div>
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-header bg-secondary text-white rounded-top-4">
+            <h5 class="mb-0">Mevcut Duyurular</h5>
+        </div>
+        <div class="card-body bg-light">
+            {% if announcements %}
+                {% for ann in announcements %}
+                <div class="mb-3 p-3 bg-white rounded-3 shadow-sm border-start border-4 border-primary position-relative">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold" style="font-size:1.1rem;">{{ ann.title }}</span>
+                        <span class="text-muted" style="font-size:0.95rem;">{{ ann.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                        <div class="ms-3 d-flex gap-2 align-items-center">
+                            <!-- Düzenle Butonu -->
+                            <button class="btn btn-sm btn-outline-primary rounded-circle d-flex align-items-center justify-content-center" style="width:2.1rem; height:2.1rem;" data-bs-toggle="modal" data-bs-target="#editAnnModal" data-id="{{ ann.id }}" data-title="{{ ann.title }}" data-content="{{ ann.content }}" title="Düzenle">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <!-- Sil Butonu -->
+                            <form method="post" action="{{ url_for('delete_announcement', ann_id=ann.id) }}" onsubmit="return confirm('Duyuruyu silmek istediğinize emin misiniz?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle d-flex align-items-center justify-content-center" style="width:2.1rem; height:2.1rem;" title="Sil">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <div>{{ ann.content|safe }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">Henüz duyuru yok.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Modalı container dışına, dosyanın en sonuna ekle -->
+<div class="modal fade" id="editAnnModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editAnnForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Duyuruyu Düzenle</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Başlık</label>
+            <input type="text" class="form-control" name="title" id="editAnnTitle" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">İçerik</label>
+            <textarea class="form-control" name="content" id="editAnnContent" rows="3" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var editAnnModal = document.getElementById('editAnnModal');
+  editAnnModal.addEventListener('show.bs.modal', function (event) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    var button = event.relatedTarget;
+    var id = button.getAttribute('data-id');
+    var title = button.getAttribute('data-title');
+    var content = button.getAttribute('data-content');
+    document.getElementById('editAnnTitle').value = title;
+    document.getElementById('editAnnContent').value = content;
+    document.getElementById('editAnnForm').action = '/admin/announcements/' + id + '/edit';
+  });
+});
+</script>
+{% endblock %} 

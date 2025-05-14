@@ -33,8 +33,18 @@
                        class="btn btn-primary w-100 {% if not progress or not progress.completed %}disabled{% endif %}">
                         Sonraki Video
                     </a>
-                {% elif video.order == video.course.videos|length %}
-                    <button id="finishTrainingBtn" class="btn btn-success w-100 d-none">Eğitimi Bitir</button>
+                {% elif is_last_video %}
+                    {% if progress and progress.completed %}
+                        {% if test_completed is not none %}
+                            {% if not test_completed %}
+                                <a href="{{ url_for('pdf_test', course_id=video.course.id) }}" class="btn btn-success w-100">Teste Gir</a>
+                            {% else %}
+                                <button id="finishTrainingBtn" class="btn btn-success w-100">Kursu Bitir</button>
+                            {% endif %}
+                        {% else %}
+                            <button id="finishTrainingBtn" class="btn btn-success w-100">Kursu Bitir</button>
+                        {% endif %}
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -101,12 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                if (nextButton) {
-                    nextButton.classList.remove('disabled');
-                }
-                if (finishBtn) {
-                    finishBtn.classList.remove('d-none');
-                }
+                window.location.reload();
             }
         });
     });

@@ -98,4 +98,10 @@ class Progress(db.Model):
     completed = db.Column(db.Boolean, default=False)
     completed_at = db.Column(db.DateTime)
     test_score = db.Column(db.Integer)
-    test_completed = db.Column(db.Boolean, default=False) 
+    test_completed = db.Column(db.Boolean, default=False)
+
+class Announcement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow) 

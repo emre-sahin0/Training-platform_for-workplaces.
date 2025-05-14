@@ -8,7 +8,7 @@
                 <h3 class="card-title">Yeni Kurs Oluştur</h3>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="title" class="form-label">Kurs Başlığı</label>
                         <input type="text" class="form-control" id="title" name="title" required>
@@ -36,11 +36,14 @@
                         <label class="form-label fw-bold">Video(lar) Ekle</label>
                         <div id="videoInputs">
                             <div class="row g-2 mb-2 video-input-row">
-                                <div class="col-md-6">
+                                <div class="col-md-5">
                                     <input type="text" class="form-control" name="video_titles[]" placeholder="Video Başlığı" required>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-5">
                                     <input type="file" class="form-control" name="video_files[]" accept="video/*" required>
+                                </div>
+                                <div class="col-md-2 d-flex align-items-center">
+                                    <button type="button" class="btn btn-danger btn-sm remove-video-btn" onclick="removeVideoInput(this)">Sil</button>
                                 </div>
                             </div>
                         </div>
@@ -90,15 +93,15 @@
                             <div class="tab-pane fade" id="pdfTest" role="tabpanel">
                                 <div class="mb-3">
                                     <label class="form-label">Test PDF Dosyası</label>
-                                    <input type="file" class="form-control" name="test_pdf" accept="application/pdf">
+                                    <input type="file" class="form-control" name="test_pdf" accept="application/pdf" required>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Soru Sayısı</label>
-                                    <input type="number" class="form-control" name="pdf_question_count" min="1">
+                                    <input type="number" class="form-control" name="pdf_question_count" min="1" required>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
-                                    <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A">
+                                    <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A" required>
                                 </div>
                             </div>
                         </div>
@@ -110,6 +113,16 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="list-group">
+    {% if videos %}
+        {% for video in videos %}
+            <!-- video kartı -->
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info m-3">Bu kursa henüz video eklenmemiş.</div>
+    {% endif %}
 </div>
 
 <style>
@@ -161,18 +174,29 @@
 <script>
 function addVideoInput() {
     const container = document.getElementById('videoInputs');
-    const idx = container.querySelectorAll('.video-input-row').length;
     const row = document.createElement('div');
     row.className = 'row g-2 mb-2 video-input-row';
     row.innerHTML = `
-        <div class="col-md-6">
+        <div class="col-md-5">
             <input type="text" class="form-control" name="video_titles[]" placeholder="Video Başlığı" required>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-5">
             <input type="file" class="form-control" name="video_files[]" accept="video/*" required>
+        </div>
+        <div class="col-md-2 d-flex align-items-center">
+            <button type="button" class="btn btn-danger btn-sm remove-video-btn" onclick="removeVideoInput(this)">Sil</button>
         </div>
     `;
     container.appendChild(row);
+}
+
+function removeVideoInput(btn) {
+    const container = document.getElementById('videoInputs');
+    if (container.querySelectorAll('.video-input-row').length > 1) {
+        btn.closest('.video-input-row').remove();
+    } else {
+        alert('En az bir video eklemelisiniz!');
+    }
 }
 
 // Dinamik soru ekleme
@@ -202,6 +226,28 @@ document.getElementById('addQuestionBtn').onclick = function() {
     area.insertAdjacentHTML('beforeend', html);
     questionIndex++;
 };
+
+// Sekme değiştikçe required inputları yönet
+const classicInputs = document.querySelectorAll('#classicTest input');
+const pdfInputs = document.querySelectorAll('#pdfTest input');
+const classicTab = document.getElementById('classic-tab');
+const pdfTab = document.getElementById('pdf-tab');
+
+function setRequired(inputs, value) {
+    inputs.forEach(input => {
+        if (value) input.setAttribute('required', 'required');
+        else input.removeAttribute('required');
+    });
+}
+
+classicTab.addEventListener('click', function() {
+    setRequired(classicInputs, true);
+    setRequired(pdfInputs, false);
+});
+pdfTab.addEventListener('click', function() {
+    setRequired(classicInputs, false);
+    setRequired(pdfInputs, true);
+});
 </script>
 {% endblock %}
 {% endblock %} 

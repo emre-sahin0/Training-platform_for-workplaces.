@@ -8,8 +8,10 @@
             <div class="card-body">
                 <h5 class="mb-3">Test PDF</h5>
                 <div class="mb-4 text-center">
-                    <embed src="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" type="application/pdf" width="100%" height="500px" />
-                    <p class="small text-muted mt-2">PDF dosyası açılmıyorsa <a href="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" target="_blank">buradan indir</a>.</p>
+                    <embed src="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" type="application/pdf" width="100%" height="500px" style="border-radius:1rem; border:1.5px solid #e0eafc;" />
+                    <a href="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" class="btn btn-outline-primary btn-sm mt-2" target="_blank">PDF'yi Yeni Sekmede Aç</a>
+                    <a href="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" class="btn btn-outline-success btn-sm mt-2" download>PDF'yi İndir</a>
+                    <p class="small text-muted mt-2">PDF görünmüyorsa yukarıdaki butonları kullanabilirsiniz.</p>
                 </div>
                 <form method="POST">
                     <h5 class="mb-3">Cevaplarınızı işaretleyin</h5>
@@ -32,4 +34,74 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+if (isMobile()) {
+    document.getElementById('pdf-viewer').style.display = 'flex';
+    var script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js";
+    script.onload = function() {
+        const url = "{{ url_for('static', filename='uploads/' + course.test_pdf) }}";
+        const pdfjsLib = window['pdfjsLib'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
+        let pdfDoc = null, pageNum = 1, pageRendering = false, pageNumPending = null;
+        const scale = 1.3;
+        const canvas = document.getElementById('pdf-canvas');
+        const ctx = canvas.getContext('2d');
+        function renderPage(num) {
+            pageRendering = true;
+            pdfDoc.getPage(num).then(function(page) {
+                const viewport = page.getViewport({scale: scale});
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                const renderTask = page.render(renderContext);
+                renderTask.promise.then(function() {
+                    pageRendering = false;
+                    document.getElementById('page-info').textContent = `Sayfa ${pageNum} / ${pdfDoc.numPages}`;
+                    if (pageNumPending !== null) {
+                        renderPage(pageNumPending);
+                        pageNumPending = null;
+                    }
+                });
+            });
+        }
+        function queueRenderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        }
+        document.getElementById('prev-page').addEventListener('click', function() {
+            if (pageNum <= 1) return;
+            pageNum--;
+            queueRenderPage(pageNum);
+        });
+        document.getElementById('next-page').addEventListener('click', function() {
+            if (pageNum >= pdfDoc.numPages) return;
+            pageNum++;
+            queueRenderPage(pageNum);
+        });
+        pdfjsLib.getDocument(url).promise.then(function(pdfDoc_) {
+            pdfDoc = pdfDoc_;
+            document.getElementById('page-info').textContent = `Sayfa 1 / ${pdfDoc.numPages}`;
+            renderPage(pageNum);
+        }, function (reason) {
+            document.getElementById('pdf-viewer').innerHTML = '<div class="text-danger">PDF yüklenemedi.</div>';
+        });
+    };
+    document.body.appendChild(script);
+} else {
+    document.getElementById('pdf-embed').style.display = 'block';
+}
+</script>
 {% endblock %} 

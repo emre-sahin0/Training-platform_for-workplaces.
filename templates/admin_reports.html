@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Raporlar</h2>
+    <form method="post" action="{{ url_for('download_multi_report') }}">
+        <div class="mb-3">
+            <label class="form-label">Kurs(lar) Seç:</label>
+            <div class="d-flex flex-wrap gap-3">
+                {% for course in courses %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="course_ids" value="{{ course.id }}" id="course_{{ course.id }}">
+                    <label class="form-check-label" for="course_{{ course.id }}">{{ course.title }}</label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success mb-4">Excel'e Aktar</button>
+    </form>
+    <hr class="my-4">
+    <form method="get">
+        <div class="mb-3">
+            <label for="courseSelect" class="form-label">Kurs(lar) Seç (Sayfada Görüntüle):</label>
+            <select class="form-select" id="courseSelect" name="course_ids" multiple required>
+                {% for course in courses %}
+                    <option value="{{ course.id }}" {% if course.id|string in request.args.getlist('course_ids') %}selected{% endif %}>{{ course.title }}</option>
+                {% endfor %}
+            </select>
+            <small class="form-text text-muted">Birden fazla kurs seçmek için Ctrl (veya Cmd) tuşunu kullanabilirsiniz.</small>
+        </div>
+        <button type="submit" class="btn btn-primary mb-4">Raporları Göster</button>
+    </form>
+
+    {% for course in courses %}
+        {% if course.id|string in request.args.getlist('course_ids') %}
+            <div class="mb-5 p-4 rounded-4 shadow-lg" style="background:rgba(255,255,255,0.92); border:1.5px solid #e0eafc;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="fw-bold mb-0" style="color:#4f8cff">{{ course.title }}</h3>
+                    <span class="text-muted" style="font-size:1.1rem;">Rapor Tarihi: {{ now().strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                <hr>
+                <table class="table table-bordered align-middle bg-white rounded-4">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Kullanıcı Adı</th>
+                            <th>E-posta</th>
+                            <th>Tamamlanan Video</th>
+                            <th>Toplam Video</th>
+                            <th>İlerleme (%)</th>
+                            <th>Test Sonucu</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in course.assigned_users %}
+                        {% set completed_videos = 0 %}
+                        {% set test_score = '-' %}
+                        {% set test_status = 'Devam Ediyor' %}
+                        {% set last_completed_at = '' %}
+                        {% for video in course.videos %}
+                            {% set progress = (user.progress|selectattr('video_id', 'equalto', video.id)|first) %}
+                            {% if progress and progress.completed %}
+                                {% set completed_videos = completed_videos + 1 %}
+                                {% if progress.completed_at %}{% set last_completed_at = progress.completed_at.strftime('%d.%m.%Y %H:%M') %}{% endif %}
+                                {% if progress.test_score is not none %}{% set test_score = progress.test_score %}{% endif %}
+                                {% if progress.test_completed %}{% set test_status = 'Tamamlandı' %}{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set total_videos = course.videos|length %}
+                        {% set percent = (completed_videos / total_videos * 100)|round|int if total_videos > 0 else 0 %}
+                        <tr>
+                            <td>{{ user.first_name }} {{ user.last_name }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ completed_videos }}</td>
+                            <td>{{ total_videos }}</td>
+                            <td>{{ percent }}%</td>
+                            <td>{{ test_score }}</td>
+                            <td>{{ test_status }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endblock %} 

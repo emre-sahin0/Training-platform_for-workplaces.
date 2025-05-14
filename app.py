@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 import openpyxl
 from config import Config
-from models import db, login_manager, User, Course, Video, Test, Question, Option, Progress
+from models import db, login_manager, User, Course, Video, Test, Question, Option, Progress, Announcement
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def create_app():
@@ -45,32 +45,32 @@ def logout():
 def dashboard():
     if current_user.is_admin:
         courses = Course.query.all()
-        users = User.query.all()
         selected_course_id = request.args.get('course_id', type=int)
         selected_course = Course.query.get(selected_course_id) if selected_course_id else (courses[0] if courses else None)
         user_progress = []
         if selected_course:
+            users = selected_course.assigned_users  # SADECE ATANANLAR
             for user in users:
-                if not user.is_admin:
-                    # Her video için sadece bir tamamlanma kaydı say
-                    video_ids = set(v.id for v in selected_course.videos)
-                    completed_videos = len({p.video_id for p in user.progress if p.completed and p.video_id in video_ids})
-                    total_videos = len(video_ids)
-                    percent = int((completed_videos / total_videos) * 100) if total_videos else 0
-                    if percent > 100:
-                        percent = 100
-                    user_progress.append({
-                        'user': user,
-                        'completed_videos': completed_videos,
-                        'total_videos': total_videos,
-                        'percent': percent,
-                        'test_score': max((p.test_score for p in user.progress if p.video.course_id == selected_course.id and p.test_score is not None), default=None),
-                        'test_completed': any(p.test_completed for p in user.progress if p.video.course_id == selected_course.id),
-                    })
+                # Her video için sadece bir tamamlanma kaydı say
+                video_ids = set(v.id for v in selected_course.videos)
+                completed_videos = len({p.video_id for p in user.progress if p.completed and p.video_id in video_ids})
+                total_videos = len(video_ids)
+                percent = int((completed_videos / total_videos) * 100) if total_videos else 0
+                if percent > 100:
+                    percent = 100
+                user_progress.append({
+                    'user': user,
+                    'completed_videos': completed_videos,
+                    'total_videos': total_videos,
+                    'percent': percent,
+                    'test_score': max((p.test_score for p in user.progress if p.video.course_id == selected_course.id and p.test_score is not None), default=None),
+                    'test_completed': any(p.test_completed for p in user.progress if p.video.course_id == selected_course.id),
+                })
         return render_template('admin_dashboard.html', courses=courses, selected_course=selected_course, user_progress=user_progress)
     else:
         courses = current_user.assigned_courses
-        return render_template('user_dashboard.html', courses=courses)
+        announcements = Announcement.query.order_by(Announcement.created_at.desc()).all()
+        return render_template('user_dashboard.html', courses=courses, announcements=announcements)
 
 @app.route('/course/<int:course_id>')
 @login_required
@@ -84,7 +84,28 @@ def course(course_id):
 def video(video_id):
     video = Video.query.get_or_404(video_id)
     progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
-    return render_template('video.html', video=video, progress=progress)
+    # Son video mu ve test var mı kontrolü
+    is_last_video = False
+    test_completed = None
+    course = video.course
+    videos = sorted(course.videos, key=lambda v: v.order)
+    if videos and video.id == videos[-1].id:
+        is_last_video = True
+        # Test tamamlanma durumu (PDF veya klasik test olabilir)
+        test_completed = False
+        # PDF test
+        if course.test_pdf and course.test_question_count and course.test_answer_key:
+            last_video = videos[-1]
+            last_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
+            if last_progress and last_progress.test_completed:
+                test_completed = True
+        # Klasik test
+        elif course.tests and course.tests[0].questions:
+            last_video = videos[-1]
+            last_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
+            if last_progress and last_progress.test_completed:
+                test_completed = True
+    return render_template('video.html', video=video, progress=progress, is_last_video=is_last_video, test_completed=test_completed)
 
 @app.route('/test/<int:test_id>', methods=['GET', 'POST'])
 @login_required
@@ -213,45 +234,68 @@ def upload_video(course_id):
 def generate_report():
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
-    
+
+    selected_course_id = request.args.get('course_id', type=int)
+    selected_course = Course.query.get(selected_course_id) if selected_course_id else None
+
+    if not selected_course:
+        flash('Rapor için bir kurs seçmelisiniz.')
+        return redirect(url_for('dashboard'))
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Eğitim Raporu"
-    
+
     # Başlıkları ekle
-    headers = ['Kullanıcı', 'Kurs', 'Tamamlanma Yüzdesi', 'Test Sonucu', 'Durum', 'Tamamlanma Tarihi']
+    headers = ['Kullanıcı', 'E-posta', 'Kurs', 'Tamamlanan Video', 'Toplam Video', 'İlerleme (%)', 'Test Sonucu', 'Durum', 'Tamamlanma Tarihi']
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = Font(bold=True, color='FFFFFF')
         cell.fill = PatternFill(start_color='6A82FB', end_color='6A82FB', fill_type='solid')
         cell.alignment = Alignment(horizontal='center', vertical='center')
         cell.border = Border(left=Side(style='thin', color='B4B4B4'), right=Side(style='thin', color='B4B4B4'), top=Side(style='thin', color='B4B4B4'), bottom=Side(style='thin', color='B4B4B4'))
-    
-    # Verileri ekle
+
     row = 2
-    users = User.query.filter_by(is_admin=False).all()
+    users = selected_course.assigned_users
+    videos = selected_course.videos
     for user in users:
-        for progress in user.progress:
-            ws.cell(row=row, column=1, value=f"{user.first_name} {user.last_name}")
-            ws.cell(row=row, column=2, value=progress.video.course.title)
-            percent = 100 if progress.completed else 0
-            percent_cell = ws.cell(row=row, column=3, value=f"{percent}%")
-            percent_cell.alignment = Alignment(horizontal='center')
-            percent_cell.fill = PatternFill(start_color='A1C4FD', end_color='A1C4FD', fill_type='solid')
-            ws.cell(row=row, column=4, value=f"{progress.test_score if progress.test_completed else '-'}")
-            # Durum
-            status_cell = ws.cell(row=row, column=5, value='Tamamlandı' if progress.completed else 'Devam Ediyor')
-            if progress.completed:
-                status_cell.fill = PatternFill(start_color='43E97B', end_color='43E97B', fill_type='solid')
-                status_cell.font = Font(bold=True, color='222222')
-            else:
-                status_cell.fill = PatternFill(start_color='FFB347', end_color='FFB347', fill_type='solid')
-                status_cell.font = Font(bold=True, color='222222')
-            ws.cell(row=row, column=6, value=progress.completed_at.strftime('%Y-%m-%d %H:%M:%S') if progress.completed_at else '')
-            for col in range(1, 7):
-                ws.cell(row=row, column=col).border = Border(left=Side(style='thin', color='B4B4B4'), right=Side(style='thin', color='B4B4B4'), top=Side(style='thin', color='B4B4B4'), bottom=Side(style='thin', color='B4B4B4'))
-            row += 1
-    
+        completed_videos = 0
+        last_completed_at = ''
+        test_score = '-'
+        test_status = 'Devam Ediyor'
+        for video in videos:
+            progress = Progress.query.filter_by(user_id=user.id, video_id=video.id).first()
+            if progress and progress.completed:
+                completed_videos += 1
+                if progress.completed_at:
+                    last_completed_at = progress.completed_at.strftime('%Y-%m-%d %H:%M:%S')
+                if progress.test_score is not None:
+                    test_score = progress.test_score
+                if progress.test_completed:
+                    test_status = 'Tamamlandı'
+        total_videos = len(videos)
+        percent = int((completed_videos / total_videos) * 100) if total_videos else 0
+        ws.cell(row=row, column=1, value=f"{user.first_name} {user.last_name}")
+        ws.cell(row=row, column=2, value=user.email)
+        ws.cell(row=row, column=3, value=selected_course.title)
+        ws.cell(row=row, column=4, value=completed_videos)
+        ws.cell(row=row, column=5, value=total_videos)
+        percent_cell = ws.cell(row=row, column=6, value=f"{percent}%")
+        percent_cell.alignment = Alignment(horizontal='center')
+        percent_cell.fill = PatternFill(start_color='A1C4FD', end_color='A1C4FD', fill_type='solid')
+        ws.cell(row=row, column=7, value=test_score)
+        status_cell = ws.cell(row=row, column=8, value=test_status)
+        if test_status == 'Tamamlandı':
+            status_cell.fill = PatternFill(start_color='43E97B', end_color='43E97B', fill_type='solid')
+            status_cell.font = Font(bold=True, color='222222')
+        else:
+            status_cell.fill = PatternFill(start_color='FFB347', end_color='FFB347', fill_type='solid')
+            status_cell.font = Font(bold=True, color='222222')
+        ws.cell(row=row, column=9, value=last_completed_at)
+        for col in range(1, 10):
+            ws.cell(row=row, column=col).border = Border(left=Side(style='thin', color='B4B4B4'), right=Side(style='thin', color='B4B4B4'), top=Side(style='thin', color='B4B4B4'), bottom=Side(style='thin', color='B4B4B4'))
+        row += 1
+
     # Sütun genişliklerini ayarla
     for col in ws.columns:
         max_length = 0
@@ -263,11 +307,10 @@ def generate_report():
             except:
                 pass
         ws.column_dimensions[column].width = max_length + 4
-    
-    # Excel dosyasını kaydet
-    report_path = os.path.join(app.config['UPLOAD_FOLDER'], 'report.xlsx')
+
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], f'report_{selected_course.id}.xlsx')
     wb.save(report_path)
-    
+
     return send_file(report_path, as_attachment=True)
 
 @app.route('/video/<int:video_id>/complete', methods=['POST'])
@@ -438,13 +481,20 @@ def delete_course(course_id):
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
     course = Course.query.get_or_404(course_id)
+    # Önce testleri, soruları ve şıkları sil
+    for test in course.tests:
+        for question in test.questions:
+            for option in question.options:
+                db.session.delete(option)
+            db.session.delete(question)
+        db.session.delete(test)
     # Kursun tüm videolarını ve ilerlemeleri sil
     for video in course.videos:
         Progress.query.filter_by(video_id=video.id).delete()
         db.session.delete(video)
     db.session.delete(course)
     db.session.commit()
-    flash('Kurs ve tüm videoları silindi.')
+    flash('Kurs ve tüm videoları/testleri silindi.')
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/courses')
@@ -562,6 +612,136 @@ def pdf_test(course_id):
         return redirect(url_for('course', course_id=course_id))
 
     return render_template('pdf_test.html', course=course)
+
+@app.route('/admin/reports')
+@login_required
+def admin_reports():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    courses = Course.query.all()
+    return render_template('admin_reports.html', courses=courses, now=datetime.now)
+
+@app.route('/admin/reports/download', methods=['POST'])
+@login_required
+def download_multi_report():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    course_ids = request.form.getlist('course_ids')
+    if not course_ids:
+        flash('En az bir kurs seçmelisiniz.')
+        return redirect(url_for('admin_reports'))
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Raporlar'
+    row = 1
+    for course_id in course_ids:
+        course = Course.query.get(int(course_id))
+        # Kurs başlığı
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+        ws.cell(row=row, column=1, value=f"{course.title} - Rapor Tarihi: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=13, color='4f8cff')
+        ws.cell(row=row, column=1).alignment = Alignment(horizontal='center')
+        row += 1
+        # Sütun başlıkları
+        headers = ['Kullanıcı Adı', 'E-posta', 'T. Video', 'Tamamlanan', 'İlerleme (%)', 'Test Sonucu', 'Durum', 'Son Tamamlanma']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = Font(bold=True, color='FFFFFF')
+            cell.fill = PatternFill(start_color='6A82FB', end_color='6A82FB', fill_type='solid')
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = Border(left=Side(style='thin', color='B4B4B4'), right=Side(style='thin', color='B4B4B4'), top=Side(style='thin', color='B4B4B4'), bottom=Side(style='thin', color='B4B4B4'))
+        row += 1
+        # Kullanıcı satırları
+        for user in course.assigned_users:
+            completed_videos = 0
+            last_completed_at = ''
+            test_score = '-'
+            test_status = 'Devam Ediyor'
+            for video in course.videos:
+                progress = Progress.query.filter_by(user_id=user.id, video_id=video.id).first()
+                if progress and progress.completed:
+                    completed_videos += 1
+                    if progress.completed_at:
+                        last_completed_at = progress.completed_at.strftime('%d.%m.%Y %H:%M')
+                    if progress.test_score is not None:
+                        test_score = progress.test_score
+                    if progress.test_completed:
+                        test_status = 'Tamamlandı'
+            total_videos = len(course.videos)
+            percent = int((completed_videos / total_videos) * 100) if total_videos else 0
+            ws.cell(row=row, column=1, value=f"{user.first_name} {user.last_name}")
+            ws.cell(row=row, column=2, value=user.email)
+            ws.cell(row=row, column=3, value=total_videos)
+            ws.cell(row=row, column=4, value=completed_videos)
+            ws.cell(row=row, column=5, value=f"{percent}%")
+            ws.cell(row=row, column=6, value=test_score)
+            ws.cell(row=row, column=7, value=test_status)
+            ws.cell(row=row, column=8, value=last_completed_at)
+            for col in range(1, 9):
+                ws.cell(row=row, column=col).border = Border(left=Side(style='thin', color='B4B4B4'), right=Side(style='thin', color='B4B4B4'), top=Side(style='thin', color='B4B4B4'), bottom=Side(style='thin', color='B4B4B4'))
+            row += 1
+        # Her kursun tablosundan sonra bir satır boşluk bırak
+        row += 1
+    # Sütun genişlikleri (MergedCell hatasına karşı güvenli)
+    for col in ws.columns:
+        first_cell = next((cell for cell in col if hasattr(cell, 'column_letter')), None)
+        if not first_cell:
+            continue
+        column = first_cell.column_letter
+        max_length = 0
+        for cell in col:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+        ws.column_dimensions[column].width = max_length + 4
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], f'multi_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx')
+    wb.save(report_path)
+    return send_file(report_path, as_attachment=True)
+
+@app.route('/admin/announcements', methods=['GET', 'POST'])
+@login_required
+def admin_announcements():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        if title and content:
+            ann = Announcement(title=title, content=content)
+            db.session.add(ann)
+            db.session.commit()
+            flash('Duyuru eklendi.', 'success')
+        else:
+            flash('Başlık ve içerik zorunlu.', 'danger')
+    announcements = Announcement.query.order_by(Announcement.created_at.desc()).all()
+    return render_template('admin_announcements.html', announcements=announcements)
+
+@app.route('/admin/announcements/<int:ann_id>/delete', methods=['POST'])
+@login_required
+def delete_announcement(ann_id):
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    ann = Announcement.query.get_or_404(ann_id)
+    db.session.delete(ann)
+    db.session.commit()
+    flash('Duyuru silindi.', 'success')
+    return redirect(url_for('admin_announcements'))
+
+@app.route('/admin/announcements/<int:ann_id>/edit', methods=['POST'])
+@login_required
+def edit_announcement(ann_id):
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    ann = Announcement.query.get_or_404(ann_id)
+    title = request.form.get('title')
+    content = request.form.get('content')
+    if title and content:
+        ann.title = title
+        ann.content = content
+        db.session.commit()
+        flash('Duyuru güncellendi.', 'success')
+    else:
+        flash('Başlık ve içerik zorunlu.', 'danger')
+    return redirect(url_for('admin_announcements'))
 
 if __name__ == '__main__':
     with app.app_context():
