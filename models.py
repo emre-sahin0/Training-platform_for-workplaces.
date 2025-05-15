@@ -44,6 +44,7 @@ class Course(db.Model):
     test_pdf = db.Column(db.String(200))
     test_question_count = db.Column(db.Integer)
     test_answer_key = db.Column(db.String(200))
+    test_images = db.Column(db.Text)  # PDF test fotoğrafları (virgülle ayrılmış dosya adları)
     assigned_users = db.relationship('User', secondary='assigned_courses', back_populates='assigned_courses')
 
     def get_user_progress(self, user):

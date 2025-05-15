@@ -2,6 +2,18 @@
 
 {% block content %}
 <div class="row">
+    <div class="col-12 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="mb-2">Kurs İlerleme Durumu</h5>
+                <div class="mb-1" style="font-weight: 500;">İlerleme: {{ completed_steps }}/{{ total_steps }} Aşama (%{{ progress_percent }})</div>
+                <div class="progress mb-2" style="height: 24px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress_percent }}%; font-weight: bold; font-size: 1rem;" aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
@@ -37,7 +49,9 @@
                     {% if progress and progress.completed %}
                         {% if test_completed is not none %}
                             {% if not test_completed %}
-                                <a href="{{ url_for('pdf_test', course_id=video.course.id) }}" class="btn btn-success w-100">Teste Gir</a>
+                                {% if test_pdf or test_image %}
+                                    <a href="{{ url_for('pdf_test', course_id=video.course.id) }}" class="btn btn-success w-100">Teste Gir</a>
+                                {% endif %}
                             {% else %}
                                 <button id="finishTrainingBtn" class="btn btn-success w-100">Kursu Bitir</button>
                             {% endif %}

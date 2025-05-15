@@ -8,10 +8,14 @@
             <div class="card-body">
                 <h5 class="mb-3">Test PDF</h5>
                 <div class="mb-4 text-center">
-                    <embed src="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" type="application/pdf" width="100%" height="500px" style="border-radius:1rem; border:1.5px solid #e0eafc;" />
-                    <a href="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" class="btn btn-outline-primary btn-sm mt-2" target="_blank">PDF'yi Yeni Sekmede Aç</a>
-                    <a href="{{ url_for('static', filename='uploads/' + course.test_pdf) }}" class="btn btn-outline-success btn-sm mt-2" download>PDF'yi İndir</a>
-                    <p class="small text-muted mt-2">PDF görünmüyorsa yukarıdaki butonları kullanabilirsiniz.</p>
+                    {% if test_file_type == 'pdf' %}
+                        <embed src="{{ url_for('static', filename='uploads/' + test_file_name) }}" type="application/pdf" width="100%" height="500px" style="border-radius:1rem; border:1.5px solid #e0eafc;" />
+                        <a href="{{ url_for('static', filename='uploads/' + test_file_name) }}" class="btn btn-outline-primary btn-sm mt-2" target="_blank">PDF'yi Yeni Sekmede Aç</a>
+                        <a href="{{ url_for('static', filename='uploads/' + test_file_name) }}" class="btn btn-outline-success btn-sm mt-2" download>PDF'yi İndir</a>
+                        <p class="small text-muted mt-2">PDF görünmüyorsa yukarıdaki butonları kullanabilirsiniz.</p>
+                    {% elif test_file_type == 'image' %}
+                        <img src="{{ url_for('static', filename='uploads/' + test_file_name) }}" alt="Test Görseli" class="img-fluid rounded shadow mb-3" style="max-height:500px;">
+                    {% endif %}
                 </div>
                 <form method="POST">
                     <h5 class="mb-3">Cevaplarınızı işaretleyin</h5>
@@ -37,6 +41,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if test_file_type == 'pdf' %}
 <script>
 function isMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -46,7 +51,7 @@ if (isMobile()) {
     var script = document.createElement('script');
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js";
     script.onload = function() {
-        const url = "{{ url_for('static', filename='uploads/' + course.test_pdf) }}";
+        const url = "{{ url_for('static', filename='uploads/' + test_file_name) }}";
         const pdfjsLib = window['pdfjsLib'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
         let pdfDoc = null, pageNum = 1, pageRendering = false, pageNumPending = null;
@@ -101,7 +106,9 @@ if (isMobile()) {
     };
     document.body.appendChild(script);
 } else {
-    document.getElementById('pdf-embed').style.display = 'block';
+    var embed = document.getElementById('pdf-embed');
+    if (embed) embed.style.display = 'block';
 }
 </script>
+{% endif %}
 {% endblock %} 

@@ -84,28 +84,36 @@ def course(course_id):
 def video(video_id):
     video = Video.query.get_or_404(video_id)
     progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
-    # Son video mu ve test var mı kontrolü
     is_last_video = False
     test_completed = None
     course = video.course
     videos = sorted(course.videos, key=lambda v: v.order)
+    # Video aşamaları
+    total_videos = len(videos)
+    completed_videos = 0
+    for v in videos:
+        p = Progress.query.filter_by(user_id=current_user.id, video_id=v.id).first()
+        if p and p.completed:
+            completed_videos += 1
+    # Test aşaması
+    has_test = bool((course.test_pdf and course.test_question_count and course.test_answer_key) or (course.tests and course.tests[0].questions))
+    test_is_completed = False
+    if has_test:
+        # Son video üzerinden test tamamlanma kontrolü
+        last_video = videos[-1] if videos else None
+        if last_video:
+            last_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
+            if last_progress and last_progress.test_completed:
+                test_is_completed = True
+    # Toplam aşama ve tamamlanan aşama
+    total_steps = total_videos + (1 if has_test else 0)
+    completed_steps = completed_videos + (1 if test_is_completed else 0)
+    progress_percent = int((completed_steps / total_steps) * 100) if total_steps > 0 else 0
+    # Son video ve test durumu
     if videos and video.id == videos[-1].id:
         is_last_video = True
-        # Test tamamlanma durumu (PDF veya klasik test olabilir)
-        test_completed = False
-        # PDF test
-        if course.test_pdf and course.test_question_count and course.test_answer_key:
-            last_video = videos[-1]
-            last_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
-            if last_progress and last_progress.test_completed:
-                test_completed = True
-        # Klasik test
-        elif course.tests and course.tests[0].questions:
-            last_video = videos[-1]
-            last_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
-            if last_progress and last_progress.test_completed:
-                test_completed = True
-    return render_template('video.html', video=video, progress=progress, is_last_video=is_last_video, test_completed=test_completed)
+        test_completed = test_is_completed
+    return render_template('video.html', video=video, progress=progress, is_last_video=is_last_video, test_completed=test_completed, total_videos=total_videos, completed_videos=completed_videos, progress_percent=progress_percent, total_steps=total_steps, completed_steps=completed_steps, has_test=has_test, test_pdf=course.test_pdf, test_image=course.test_images)
 
 @app.route('/test/<int:test_id>', methods=['GET', 'POST'])
 @login_required
@@ -162,36 +170,22 @@ def new_course():
                 db.session.add(video)
         db.session.commit()
 
-        # Test ekle (klasik veya PDF)
-        # Klasik test
-        question_texts = request.form.getlist('question_texts[]')
-        option1s = request.form.getlist('option1[]')
-        option2s = request.form.getlist('option2[]')
-        if question_texts and any(q.strip() for q in question_texts):
-            test = Test(title=f"{course.title} Test", course_id=course.id, passing_score=1)
-            db.session.add(test)
-            db.session.commit()
-            for i, q_text in enumerate(question_texts):
-                if not q_text.strip():
-                    continue
-                question = Question(text=q_text, test_id=test.id)
-                db.session.add(question)
-                db.session.commit()
-                # Şıklar
-                o1 = Option(text=option1s[i], is_correct=(request.form.get(f'correct_{i}') == '0'), question_id=question.id)
-                o2 = Option(text=option2s[i], is_correct=(request.form.get(f'correct_{i}') == '1'), question_id=question.id)
-                db.session.add(o1)
-                db.session.add(o2)
-                db.session.commit()
-
-        # PDF test
-        pdf_file = request.files.get('test_pdf')
+        # Test dosyası (PDF veya resim)
+        test_file = request.files.get('test_file')
         pdf_question_count = request.form.get('pdf_question_count')
         pdf_answer_key = request.form.get('pdf_answer_key')
-        if pdf_file and pdf_file.filename:
-            filename = secure_filename(f"test_{course.id}_{pdf_file.filename}")
-            pdf_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            course.test_pdf = filename
+        if test_file and test_file.filename:
+            ext = os.path.splitext(test_file.filename)[1].lower()
+            if ext == '.pdf':
+                filename = secure_filename(f"test_{course.id}_{test_file.filename}")
+                test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                course.test_pdf = filename
+                course.test_images = None
+            elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
+                img_filename = secure_filename(f"testimg_{course.id}_{datetime.utcnow().timestamp()}_{test_file.filename}")
+                test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], img_filename))
+                course.test_images = img_filename
+                course.test_pdf = None
             course.test_question_count = int(pdf_question_count) if pdf_question_count else None
             course.test_answer_key = pdf_answer_key
             db.session.commit()
@@ -489,12 +483,54 @@ def delete_course(course_id):
             db.session.delete(question)
         db.session.delete(test)
     # Kursun tüm videolarını ve ilerlemeleri sil
+    upload_folder = app.config['UPLOAD_FOLDER']
     for video in course.videos:
+        # Video dosyasını sil
+        video_path = os.path.join(upload_folder, video.video_path)
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except Exception as e:
+                print(f"Video dosyası silinemedi: {video_path} - {e}")
         Progress.query.filter_by(video_id=video.id).delete()
         db.session.delete(video)
+    # Test PDF dosyasını sil
+    if course.test_pdf:
+        pdf_path = os.path.join(upload_folder, course.test_pdf)
+        if os.path.exists(pdf_path):
+            try:
+                os.remove(pdf_path)
+            except Exception as e:
+                print(f"PDF dosyası silinemedi: {pdf_path} - {e}")
+    # Test fotoğraflarını sil
+    if course.test_images:
+        for img_filename in course.test_images.split(','):
+            img_path = os.path.join(upload_folder, img_filename)
+            if os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                except Exception as e:
+                    print(f"Test fotoğrafı silinemedi: {img_path} - {e}")
+    # Rapor dosyalarını sil
+    # Tekli rapor
+    report_path = os.path.join(upload_folder, f'report_{course.id}.xlsx')
+    if os.path.exists(report_path):
+        try:
+            os.remove(report_path)
+        except Exception as e:
+            print(f"Rapor dosyası silinemedi: {report_path} - {e}")
+    # Çoklu raporlar (multi_report_...xlsx)
+    for fname in os.listdir(upload_folder):
+        if fname.startswith('multi_report_') and fname.endswith('.xlsx'):
+            multi_report_path = os.path.join(upload_folder, fname)
+            if os.path.exists(multi_report_path):
+                try:
+                    os.remove(multi_report_path)
+                except Exception as e:
+                    print(f"Multi rapor dosyası silinemedi: {multi_report_path} - {e}")
     db.session.delete(course)
     db.session.commit()
-    flash('Kurs ve tüm videoları/testleri silindi.')
+    flash('Kurs ve tüm videoları/testleri ve dosyaları silindi.')
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/courses')
@@ -583,7 +619,16 @@ def upload_test_pdf(course_id):
 @login_required
 def pdf_test(course_id):
     course = Course.query.get_or_404(course_id)
-    if not course.test_pdf or not course.test_question_count or not course.test_answer_key:
+    # Test dosyası tipi ve adı
+    test_file_type = None
+    test_file_name = None
+    if course.test_pdf:
+        test_file_type = 'pdf'
+        test_file_name = course.test_pdf
+    elif course.test_images:
+        test_file_type = 'image'
+        test_file_name = course.test_images
+    if not test_file_type or not course.test_question_count or not course.test_answer_key:
         flash('Bu kurs için test tanımlanmamış.')
         return redirect(url_for('course', course_id=course_id))
 
@@ -611,7 +656,7 @@ def pdf_test(course_id):
         flash(f'Test tamamlandı! Başarı: %{percent}')
         return redirect(url_for('course', course_id=course_id))
 
-    return render_template('pdf_test.html', course=course)
+    return render_template('pdf_test.html', course=course, test_file_type=test_file_type, test_file_name=test_file_name)
 
 @app.route('/admin/reports')
 @login_required

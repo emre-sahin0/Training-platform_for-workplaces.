@@ -52,58 +52,17 @@
 
                     <div class="mb-4">
                         <label class="form-label fw-bold">Test Ekle</label>
-                        <ul class="nav nav-tabs mb-2" id="testTab" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="classic-tab" data-bs-toggle="tab" data-bs-target="#classicTest" type="button" role="tab">Klasik Test</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="pdf-tab" data-bs-toggle="tab" data-bs-target="#pdfTest" type="button" role="tab">PDF Test</button>
-                            </li>
-                        </ul>
-                        <div class="tab-content">
-                            <div class="tab-pane fade show active" id="classicTest" role="tabpanel">
-                                <div id="questionsArea">
-                                    <div class="card mb-3 question-card">
-                                        <div class="card-body">
-                                            <div class="mb-2">
-                                                <label class="form-label">Soru</label>
-                                                <input type="text" class="form-control" name="question_texts[]" required>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-6 mb-2">
-                                                    <input type="text" class="form-control mb-1" name="option1[]" placeholder="A şıkkı" required>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="radio" name="correct_0" value="0" required>
-                                                        <label class="form-check-label">Doğru Şık</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6 mb-2">
-                                                    <input type="text" class="form-control mb-1" name="option2[]" placeholder="B şıkkı" required>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="radio" name="correct_0" value="1">
-                                                        <label class="form-check-label">Doğru Şık</label>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-outline-primary mb-3" id="addQuestionBtn">+ Soru Ekle</button>
-                            </div>
-                            <div class="tab-pane fade" id="pdfTest" role="tabpanel">
-                                <div class="mb-3">
-                                    <label class="form-label">Test PDF Dosyası</label>
-                                    <input type="file" class="form-control" name="test_pdf" accept="application/pdf" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Soru Sayısı</label>
-                                    <input type="number" class="form-control" name="pdf_question_count" min="1" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
-                                    <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A" required>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Test Dosyası (PDF veya Fotoğraf)</label>
+                            <input type="file" class="form-control" name="test_file" accept="application/pdf,image/*" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Soru Sayısı</label>
+                            <input type="number" class="form-control" name="pdf_question_count" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
+                            <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A" required>
                         </div>
                     </div>
                     <div class="d-grid">
@@ -199,7 +158,28 @@ function removeVideoInput(btn) {
     }
 }
 
-// Dinamik soru ekleme
+// Dinamik soru ekleme ve silme
+function updateQuestionIndexes() {
+    const questionCards = document.querySelectorAll('.question-card');
+    questionCards.forEach((card, idx) => {
+        // Radio name'lerini güncelle
+        const radios = card.querySelectorAll('input[type="radio"]');
+        radios.forEach(radio => {
+            radio.name = `correct_${idx}`;
+        });
+    });
+}
+
+function removeQuestion(btn) {
+    const area = document.getElementById('questionsArea');
+    if (area.querySelectorAll('.question-card').length > 1) {
+        btn.closest('.question-card').remove();
+        updateQuestionIndexes();
+    } else {
+        alert('En az bir soru olmalı!');
+    }
+}
+
 let questionIndex = 1;
 document.getElementById('addQuestionBtn').onclick = function() {
     const area = document.getElementById('questionsArea');
@@ -222,24 +202,53 @@ document.getElementById('addQuestionBtn').onclick = function() {
                 </div>
             </div>
         </div>
+        <button type="button" class="btn btn-danger btn-sm mt-2" onclick="removeQuestion(this)">Soru Sil</button>
     </div></div>`;
     area.insertAdjacentHTML('beforeend', html);
     questionIndex++;
+    updateQuestionIndexes();
 };
+
+// İlk sorunun radio butonlarında da sadece ilkine required ekle
+window.addEventListener('DOMContentLoaded', function() {
+    const firstCard = document.querySelector('.question-card .card-body');
+    if (firstCard && !firstCard.querySelector('.btn-danger')) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-danger btn-sm mt-2';
+        btn.textContent = 'Soru Sil';
+        btn.onclick = function() { removeQuestion(btn); };
+        firstCard.appendChild(btn);
+    }
+    // Radio required düzelt
+    const radios = firstCard.querySelectorAll('input[type="radio"]');
+    if (radios.length > 1) {
+        radios[0].setAttribute('required', 'required');
+        radios[1].removeAttribute('required');
+    }
+});
 
 // Sekme değiştikçe required inputları yönet
 const classicInputs = document.querySelectorAll('#classicTest input');
 const pdfInputs = document.querySelectorAll('#pdfTest input');
 const classicTab = document.getElementById('classic-tab');
 const pdfTab = document.getElementById('pdf-tab');
-
 function setRequired(inputs, value) {
     inputs.forEach(input => {
         if (value) input.setAttribute('required', 'required');
         else input.removeAttribute('required');
     });
 }
-
+// Sayfa ilk açıldığında sadece aktif sekmedeki inputlar required olsun
+window.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('classicTest').classList.contains('show')) {
+        setRequired(classicInputs, true);
+        setRequired(pdfInputs, false);
+    } else {
+        setRequired(classicInputs, false);
+        setRequired(pdfInputs, true);
+    }
+});
 classicTab.addEventListener('click', function() {
     setRequired(classicInputs, true);
     setRequired(pdfInputs, false);
@@ -247,6 +256,17 @@ classicTab.addEventListener('click', function() {
 pdfTab.addEventListener('click', function() {
     setRequired(classicInputs, false);
     setRequired(pdfInputs, true);
+});
+// Form submit edilirken sadece aktif sekmedeki inputlar required olsun
+const form = document.querySelector('form');
+form.addEventListener('submit', function(e) {
+    if (document.getElementById('classicTest').classList.contains('show')) {
+        setRequired(classicInputs, true);
+        setRequired(pdfInputs, false);
+    } else {
+        setRequired(classicInputs, false);
+        setRequired(pdfInputs, true);
+    }
 });
 </script>
 {% endblock %}
