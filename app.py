@@ -31,7 +31,7 @@ def login():
         if user and user.check_password(request.form.get('password')):
             login_user(user)
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password')
+        flash('Kullanıcı adı veya şifre hatalı')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -791,4 +791,4 @@ def edit_announcement(ann_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True) 
+    app.run(host='0.0.0.0', port=5000, debug=True)
