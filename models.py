@@ -34,18 +34,36 @@ class User(db.Model, UserMixin):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    courses = db.relationship('Course', backref='category', lazy=True)
+    certificate_types = db.relationship('CertificateType', backref='category', lazy=True)
+
+class CertificateType(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    required_course_count = db.Column(db.Integer, default=1)  # Bu belge türü için gerekli minimum kurs sayısı
+    courses = db.relationship('Course', backref='certificate_type', lazy=True)
+
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    certificate_type_id = db.Column(db.Integer, db.ForeignKey('certificate_type.id'), nullable=True)
     videos = db.relationship('Video', backref='course', lazy=True)
     tests = db.relationship('Test', backref='course', lazy=True)
     test_pdf = db.Column(db.String(200))
     test_question_count = db.Column(db.Integer)
     test_answer_key = db.Column(db.String(200))
-    test_images = db.Column(db.Text)  # PDF test fotoğrafları (virgülle ayrılmış dosya adları)
+    test_images = db.Column(db.Text)
     assigned_users = db.relationship('User', secondary='assigned_courses', back_populates='assigned_courses')
+    passing_score = db.Column(db.Integer, default=70)  # Geçme notu
 
     def get_user_progress(self, user):
         """Calculate user's progress for this course."""
@@ -105,4 +123,20 @@ class Announcement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow) 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Certificate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref='certificates')
+    certificate_type_id = db.Column(db.Integer, db.ForeignKey('certificate_type.id'), nullable=False)
+    certificate_type = db.relationship('CertificateType', backref='certificates')
+    issue_date = db.Column(db.DateTime, default=datetime.utcnow)
+    certificate_number = db.Column(db.String(50), unique=True)
+    courses = db.relationship('Course', secondary='certificate_courses', backref='certificates')
+    certificate_file = db.Column(db.String(200))  # Yüklenen sertifika dosya yolu
+
+certificate_courses = db.Table('certificate_courses',
+    db.Column('certificate_id', db.Integer, db.ForeignKey('certificate.id'), primary_key=True),
+    db.Column('course_id', db.Integer, db.ForeignKey('course.id'), primary_key=True)
+) 

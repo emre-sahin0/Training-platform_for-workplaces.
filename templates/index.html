@@ -3,13 +3,16 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8 text-center">
-        <h1 class="display-4 mb-4">İş Sağlığı ve Güvenliği Eğitim Platformu</h1>
-        <p class="lead mb-4">
-            İş sağlığı ve güvenliği eğitimlerinizi online olarak tamamlayın.
-            Video eğitimler ve testler ile bilgilerinizi pekiştirin.
+        <h1 class="display-4 mb-4">ADAWALL Eğitim Platformu</h1>
+        <p class="lead mb-2">
+            Bu platformda <b>İş Sağlığı ve Güvenliği</b>, <b>Mağaza Eğitimleri</b> ve <b>Genel Eğitimler</b> düzenlenecektir.
+        </p>
+        <p class="mb-4">
+            Tüm eğitimlerinizi online olarak tamamlayabilir, video eğitimler ve testlerle bilginizi pekiştirebilir, ilerlemenizi kolayca takip edebilirsiniz.
         </p>
         {% if not current_user.is_authenticated %}
-            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Giriş Yap</a>
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg me-2">Giriş Yap</a>
+            <a href="{{ url_for('register') }}" class="btn btn-outline-primary btn-lg">Kayıt Ol</a>
         {% else %}
             <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">Panele Git</a>
         {% endif %}

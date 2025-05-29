@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.certificate-a4 {
+    width: 21cm;
+    height: 29.7cm;
+    background: #fff;
+    margin: 0 auto;
+    padding: 2.5cm 2cm 2cm 2cm;
+    border: 8px solid #4f8cff;
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.certificate-title {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #4f8cff;
+    text-align: center;
+    margin-bottom: 1.2rem;
+    letter-spacing: 1px;
+}
+.certificate-logo {
+    display: block;
+    margin: 0 auto 1.2rem auto;
+    max-height: 90px;
+}
+.certificate-section {
+    margin-bottom: 1.2rem;
+    text-align: center;
+}
+.certificate-label {
+    font-weight: 600;
+    color: #222;
+    font-size: 1.1rem;
+}
+.certificate-value {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #222;
+}
+.certificate-table {
+    width: 100%;
+    margin: 1.5rem 0;
+    border-collapse: collapse;
+    font-size: 1.1rem;
+}
+.certificate-table th, .certificate-table td {
+    border: 1.5px solid #4f8cff;
+    padding: 0.6rem 1rem;
+    text-align: left;
+}
+.certificate-table th {
+    background: #e0eafc;
+    color: #4f8cff;
+    font-weight: bold;
+}
+.certificate-footer {
+    position: absolute;
+    bottom: 2.5cm;
+    left: 2cm;
+    right: 2cm;
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1rem;
+    color: #555;
+}
+.certificate-sign {
+    text-align: right;
+    margin-top: 2.5cm;
+    font-size: 1.1rem;
+    color: #222;
+}
+@media print {
+    .navbar, .btn, .alert, .main-glass, .text-center, .mt-4 {
+        display: none !important;
+    }
+    .certificate-a4 {
+        display: block !important;
+        background: #fff !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        border: 8px solid #4f8cff !important;
+        margin: 0 !important;
+        padding: 2.5cm 2cm 2cm 2cm !important;
+        width: 21cm !important;
+        height: 29.7cm !important;
+        page-break-after: always;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+</style>
+<div class="certificate-a4">
+    <div class="certificate-title">
+        {% if certificate.certificate_type.category.name == 'İş Sağlığı ve Güvenliği' %}
+            İş Sağlığı ve Güvenliği Sertifikası
+        {% else %}
+            Genel Eğitim Sertifikası
+        {% endif %}
+    </div>
+    <img src="{{ url_for('static', filename='images/certificate-logo.png') }}" alt="Logo" class="certificate-logo">
+    <div class="certificate-section">
+        <span class="certificate-label">BELGE</span>
+        <p style="margin-top:0.5rem; font-size:1.15rem;">
+            {% if certificate.certificate_type.category.name == 'İş Sağlığı ve Güvenliği' %}
+                Aşağıda adı ve soyadı belirtilen kişi, İş Sağlığı ve Güvenliği alanında ilgili kursu başarıyla tamamlamış ve gerekli sınavdan geçmiştir.
+            {% else %}
+                Aşağıda adı ve soyadı belirtilen kişi, Genel Eğitimler kapsamında ilgili kursu başarıyla tamamlamış ve gerekli sınavdan geçmiştir.
+            {% endif %}
+        </p>
+        <div class="certificate-value" style="margin:1.2rem 0 0.5rem 0;">{{ certificate.user.first_name }} {{ certificate.user.last_name }}</div>
+    </div>
+    <table class="certificate-table">
+        <tr>
+            <th>Kurs Adı</th>
+            <th>Kategori</th>
+            <th>Test Puanı</th>
+            <th>Geçme Notu</th>
+        </tr>
+        {% for course in certificate.courses %}
+        <tr>
+            <td>{{ course.title }}</td>
+            <td>{{ course.category.name }}</td>
+            <td>
+                {% set last_video = course.videos|sort(attribute='order')|last %}
+                {% set progress = (certificate.user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
+                {{ progress.test_score if progress else '-' }}
+            </td>
+            <td>{{ course.passing_score }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <div class="certificate-footer">
+        <div>
+            <strong>Belge Numarası:</strong> {{ certificate.certificate_number }}<br>
+            <strong>Veriliş Tarihi:</strong> {{ certificate.issue_date.strftime('%d.%m.%Y') }}
+        </div>
+    </div>
+</div>
+<div class="text-center mt-4">
+    <a href="{{ url_for('print_certificate', certificate_id=certificate.id) }}" target="_blank" class="btn btn-primary">Belgeyi Yazdır</a>
+    <a href="{{ url_for('user_certificates') }}" class="btn btn-secondary">Geri Dön</a>
+</div>
+{% endblock %} 

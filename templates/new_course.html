@@ -18,6 +18,15 @@
                         <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
                     </div>
                     <div class="mb-3">
+                        <label for="category_id" class="form-label">Kategori</label>
+                        <select class="form-control" id="category_id" name="category_id" required>
+                            <option value="">Kategori Seçin</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-bold" style="font-size:1.1rem;">Eğitimi Alacak Kullanıcılar</label>
                         <div class="list-group user-select-list shadow rounded-4" style="max-height: 250px; overflow-y: auto;">
                             {% for user in users if not user.is_admin %}
@@ -64,6 +73,10 @@
                             <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
                             <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A" required>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="passing_score" class="form-label">Geçme Notu</label>
+                        <input type="number" class="form-control" id="passing_score" name="passing_score" min="0" max="100" value="70" required>
                     </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Kursu Oluştur</button>

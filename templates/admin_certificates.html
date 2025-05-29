@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Tüm Sertifikalar</h2>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Kullanıcı</th>
+                    <th>Belge Türü</th>
+                    <th>Kategori</th>
+                    <th>Veriliş Tarihi</th>
+                    <th>Belge Numarası</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for certificate in certificates %}
+                <tr>
+                    <td>{{ certificate.user.first_name }} {{ certificate.user.last_name }}</td>
+                    <td>{{ certificate.certificate_type.name }}</td>
+                    <td>{{ certificate.certificate_type.category.name }}</td>
+                    <td>{{ certificate.issue_date.strftime('%d.%m.%Y') }}</td>
+                    <td>{{ certificate.certificate_number }}</td>
+                    <td>
+                        <a href="{{ url_for('view_certificate', certificate_id=certificate.id) }}" class="btn btn-sm btn-primary" target="_blank">Görüntüle</a>
+                        <a href="{{ url_for('print_certificate', certificate_id=certificate.id) }}" class="btn btn-sm btn-success" target="_blank">Yazdır</a>
+                        <form action="{{ url_for('admin_upload_certificate_file', certificate_id=certificate.id) }}" method="POST" enctype="multipart/form-data" style="margin-top:8px;">
+                            <input type="file" name="certificate_file" accept="application/pdf,image/*" style="display:inline-block;width:70%;">
+                            <button type="submit" class="btn btn-sm btn-warning">Yükle</button>
+                            {% if certificate.certificate_file %}
+                                <a href="{{ url_for('static', filename='uploads/' ~ certificate.certificate_file) }}" target="_blank" class="btn btn-sm btn-info">Dosyayı Gör</a>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %} 

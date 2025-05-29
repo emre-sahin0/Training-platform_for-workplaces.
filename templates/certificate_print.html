@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sertifika Yazdır</title>
+    <style>
+        body, html {
+            background: #fff !important;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .certificate-a4 {
+            width: 21cm;
+            height: 29.7cm;
+            background: #fff;
+            margin: 0 auto;
+            padding: 2.5cm 2cm 2cm 2cm;
+            border: 8px solid #4f8cff;
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        .adawall-header {
+            text-align: center;
+            margin-bottom: 1.2rem;
+        }
+        .adawall-logo {
+            display: block;
+            margin: 0 auto 0.5rem auto;
+            max-height: 80px;
+        }
+        .adawall-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4f8cff;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+        .certificate-title {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #4f8cff;
+            text-align: center;
+            margin-bottom: 1.2rem;
+            letter-spacing: 1px;
+        }
+        .certificate-logo {
+            display: none;
+        }
+        .certificate-section {
+            margin-bottom: 1.2rem;
+            text-align: center;
+        }
+        .certificate-label {
+            font-weight: 600;
+            color: #222;
+            font-size: 1.1rem;
+        }
+        .certificate-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #222;
+        }
+        .certificate-table {
+            width: 100%;
+            margin: 1.5rem 0;
+            border-collapse: collapse;
+            font-size: 1.1rem;
+        }
+        .certificate-table th, .certificate-table td {
+            border: 1.5px solid #4f8cff;
+            padding: 0.6rem 1rem;
+            text-align: left;
+        }
+        .certificate-table th {
+            background: #e0eafc;
+            color: #4f8cff;
+            font-weight: bold;
+        }
+        .certificate-footer {
+            position: absolute;
+            bottom: 2.5cm;
+            left: 2cm;
+            right: 2cm;
+            display: flex;
+            justify-content: flex-start;
+            font-size: 1.1rem;
+            color: #555;
+        }
+        @media print {
+            body, html {
+                background: #fff !important;
+            }
+            .certificate-a4 {
+                box-shadow: none !important;
+                border: 8px solid #4f8cff !important;
+                margin: 0 !important;
+                padding: 2.5cm 2cm 2cm 2cm !important;
+                width: 21cm !important;
+                height: 29.7cm !important;
+                page-break-after: always;
+                background: #fff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="certificate-a4">
+    {% if certificate.certificate_type.category.name == 'Mağaza Eğitimleri' %}
+        <div style="position:relative;width:100%;height:100%;">
+            <img src="{{ url_for('static', filename='images/magaza_cert_bg.png') }}" alt="Mağaza Sertifika" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;">
+            <div style="position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);width:80%;text-align:center;z-index:1;">
+                <span style="font-size:2.5rem;font-weight:bold;letter-spacing:2px;">{{ (certificate.user.first_name + ' ' + certificate.user.last_name).upper() }}</span>
+            </div>
+        </div>
+    {% else %}
+        <div class="adawall-header">
+            <img src="{{ url_for('static', filename='images/ada.jpeg') }}" alt="Adawall Logo" class="adawall-logo">
+            <div class="adawall-title">Adawall Eğitim Platformu</div>
+        </div>
+        <div class="certificate-title">
+            {% if certificate.certificate_type.category.name == 'İş Sağlığı ve Güvenliği' %}
+                İş Sağlığı ve Güvenliği Sertifikası
+            {% elif certificate.certificate_type.category.name == 'Mağaza Eğitimleri' %}
+                Mağaza Eğitimleri Sertifikası
+            {% else %}
+                Genel Eğitim Sertifikası
+            {% endif %}
+        </div>
+        <div class="certificate-section">
+            <span class="certificate-label">BELGE</span>
+            <p style="margin-top:0.5rem; font-size:1.15rem;">
+                {% if certificate.certificate_type.category.name == 'İş Sağlığı ve Güvenliği' %}
+                    Aşağıda adı ve soyadı belirtilen kişi, İş Sağlığı ve Güvenliği alanında ilgili kursu başarıyla tamamlamış ve gerekli sınavdan geçmiştir.
+                {% elif certificate.certificate_type.category.name == 'Mağaza Eğitimleri' %}
+                    Aşağıda adı ve soyadı belirtilen kişi, Mağaza Eğitimleri kapsamında ilgili kursu başarıyla tamamlamış ve gerekli sınavdan geçmiştir.
+                {% else %}
+                    Aşağıda adı ve soyadı belirtilen kişi, Genel Eğitimler kapsamında ilgili kursu başarıyla tamamlamış ve gerekli sınavdan geçmiştir.
+                {% endif %}
+            </p>
+            <div class="certificate-value" style="margin:1.2rem 0 0.5rem 0;">{{ certificate.user.first_name }} {{ certificate.user.last_name }}</div>
+        </div>
+        <table class="certificate-table">
+            <tr>
+                <th>Kurs Adı</th>
+                <th>Kategori</th>
+                <th>Test Puanı</th>
+                <th>Geçme Notu</th>
+            </tr>
+            {% for course in certificate.courses %}
+            <tr>
+                <td>{{ course.title }}</td>
+                <td>{{ course.category.name }}</td>
+                <td>
+                    {% set last_video = course.videos|sort(attribute='order')|last %}
+                    {% set progress = (certificate.user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
+                    {{ progress.test_score if progress else '-' }}
+                </td>
+                <td>{{ course.passing_score }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <div class="certificate-footer">
+            <div>
+                <strong>Belge Numarası:</strong> {{ certificate.certificate_number }}<br>
+                <strong>Veriliş Tarihi:</strong> {{ certificate.issue_date.strftime('%d.%m.%Y') }}
+            </div>
+        </div>
+    {% endif %}
+</div>
+<script>
+    window.onload = function() {
+        window.print();
+    }
+</script>
+</body>
+</html> 

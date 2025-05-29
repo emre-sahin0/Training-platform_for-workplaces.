@@ -1,38 +1,86 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
+<div class="container mt-4">
+    <h2>Kurs Düzenle</h2>
+    
+    <form method="POST">
+        <div class="card mb-4">
             <div class="card-header">
-                <h3 class="card-title">Kursu Düzenle</h3>
+                <h4>Kurs Bilgileri</h4>
             </div>
             <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label for="title" class="form-label">Kurs Başlığı</label>
-                        <input type="text" class="form-control" id="title" name="title" value="{{ course.title }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Kurs Açıklaması</label>
-                        <textarea class="form-control" id="description" name="description" rows="3" required>{{ course.description }}</textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="assigned_users" class="form-label">Eğitimi Alacak Kullanıcılar</label>
-                        <select class="form-select" id="assigned_users" name="assigned_users" multiple required>
-                            {% for user in users if not user.is_admin %}
-                                <option value="{{ user.id }}" {% if user in course.assigned_users %}selected{% endif %}>{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">Birden fazla kullanıcı seçmek için Ctrl (veya Cmd) tuşunu kullanabilirsiniz.</small>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success">Kaydet</button>
-                        <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-secondary mt-2">İptal</a>
-                    </div>
-                </form>
+                <div class="mb-3">
+                    <label for="title" class="form-label">Kurs Başlığı</label>
+                    <input type="text" class="form-control" id="title" name="title" value="{{ course.title }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">Açıklama</label>
+                    <textarea class="form-control" id="description" name="description" rows="3">{{ course.description }}</textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="category_id" class="form-label">Kategori</label>
+                    <select class="form-control" id="category_id" name="category_id" required>
+                        <option value="">Kategori Seçin</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if category.id == course.category_id %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="certificate_type_id" class="form-label">Belge Türü</label>
+                    <select class="form-control" id="certificate_type_id" name="certificate_type_id">
+                        <option value="">Belge Türü Seçin</option>
+                        {% for cert_type in certificate_types %}
+                        <option value="{{ cert_type.id }}" {% if cert_type.id == course.certificate_type_id %}selected{% endif %}>
+                            {{ cert_type.name }} ({{ cert_type.category.name }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="passing_score" class="form-label">Geçme Notu</label>
+                    <input type="number" class="form-control" id="passing_score" name="passing_score" 
+                           value="{{ course.passing_score }}" min="0" max="100" required>
+                </div>
             </div>
         </div>
-    </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Kullanıcı Atamaları</h4>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Kursa Atanacak Kullanıcılar</label>
+                    <div class="row">
+                        {% for user in users %}
+                        <div class="col-md-4 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="assigned_users" 
+                                       value="{{ user.id }}" id="user_{{ user.id }}"
+                                       {% if user in course.assigned_users %}checked{% endif %}>
+                                <label class="form-check-label" for="user_{{ user.id }}">
+                                    {{ user.first_name }} {{ user.last_name }} ({{ user.email }})
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mb-4">
+            <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
+            <a href="{{ url_for('admin_courses') }}" class="btn btn-secondary">İptal</a>
+        </div>
+    </form>
 </div>
 {% endblock %} 

@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Veritabanı Görüntüleyici</h2>
+    
+    <!-- Kullanıcılar -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Kullanıcılar</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Kullanıcı Adı</th>
+                            <th>Ad</th>
+                            <th>Soyad</th>
+                            <th>E-posta</th>
+                            <th>Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.first_name }}</td>
+                            <td>{{ user.last_name }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ "Evet" if user.is_admin else "Hayır" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kurslar -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Kurslar</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Başlık</th>
+                            <th>Kategori</th>
+                            <th>Geçme Notu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for course in courses %}
+                        <tr>
+                            <td>{{ course.id }}</td>
+                            <td>{{ course.title }}</td>
+                            <td>{{ course.category.name if course.category else '-' }}</td>
+                            <td>{{ course.passing_score }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sertifikalar -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Sertifikalar</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Kullanıcı</th>
+                            <th>Sertifika Türü</th>
+                            <th>Sertifika No</th>
+                            <th>Dosya</th>
+                            <th>Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cert in certificates %}
+                        <tr>
+                            <td>{{ cert.id }}</td>
+                            <td>{{ cert.user.username }}</td>
+                            <td>{{ cert.certificate_type.name }}</td>
+                            <td>{{ cert.certificate_number }}</td>
+                            <td>{{ cert.certificate_file }}</td>
+                            <td>{{ cert.issue_date.strftime('%d.%m.%Y %H:%M') if cert.issue_date else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- İlerleme -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>İlerleme</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Kullanıcı</th>
+                            <th>Video</th>
+                            <th>Tamamlandı</th>
+                            <th>Test Puanı</th>
+                            <th>Test Tamamlandı</th>
+                            <th>Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prog in progress %}
+                        <tr>
+                            <td>{{ prog.id }}</td>
+                            <td>{{ prog.user.username }}</td>
+                            <td>{{ prog.video.title }}</td>
+                            <td>{{ "Evet" if prog.completed else "Hayır" }}</td>
+                            <td>{{ prog.test_score if prog.test_score is not none else '-' }}</td>
+                            <td>{{ "Evet" if prog.test_completed else "Hayır" }}</td>
+                            <td>{{ prog.completed_at.strftime('%d.%m.%Y %H:%M') if prog.completed_at else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kategoriler -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Kategoriler</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ad</th>
+                            <th>Açıklama</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in categories %}
+                        <tr>
+                            <td>{{ category.id }}</td>
+                            <td>{{ category.name }}</td>
+                            <td>{{ category.description }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sertifika Türleri -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Sertifika Türleri</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ad</th>
+                            <th>Kategori</th>
+                            <th>Açıklama</th>
+                            <th>Gerekli Kurs Sayısı</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cert_type in certificate_types %}
+                        <tr>
+                            <td>{{ cert_type.id }}</td>
+                            <td>{{ cert_type.name }}</td>
+                            <td>{{ cert_type.category.name if cert_type.category else '-' }}</td>
+                            <td>{{ cert_type.description }}</td>
+                            <td>{{ cert_type.required_course_count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

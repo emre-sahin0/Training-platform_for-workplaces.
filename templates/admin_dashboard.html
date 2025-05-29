@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="dashboard-hero py-4 px-3 mb-4 rounded-4 text-white" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%);">
-    <h2 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>Yönetici Paneli</h2>
+<div class="dashboard-hero py-4 px-3 mb-4 rounded-4" style="background: linear-gradient(120deg, #e0eafc 0%, #c2e9fb 100%); box-shadow: 0 4px 24px 0 #a1c4fd22; color:#222;">
+    <h2 class="fw-bold mb-1" style="color:#4f8cff;"><i class="bi bi-speedometer2 me-2"></i>Yönetici Paneli</h2>
     <div class="d-flex flex-wrap align-items-center gap-3">
         <form method="get" action="{{ url_for('dashboard') }}" class="d-flex align-items-center gap-2 bg-white bg-opacity-75 rounded-pill px-3 py-1 shadow-sm" style="border:1.5px solid #e0eafc;">
             <label for="courseSelect" class="fw-semibold mb-0 text-primary" style="font-size:1.05rem;">Eğitim Seç:</label>
@@ -12,14 +12,13 @@
                 {% endfor %}
             </select>
         </form>
-        <a href="{{ url_for('new_course') }}" class="btn btn-warning btn-sm fw-bold shadow-sm">+ Yeni Kurs</a>
     </div>
 </div>
 
 {% if selected_course %}
 <h4 class="fw-bold mb-3" style="color:#4f8cff"><i class="bi bi-people-fill me-2"></i>{{ selected_course.title }} - Katılımcı Durumları</h4>
-<div class="table-responsive">
-<table class="table table-bordered align-middle shadow-sm bg-white rounded-4">
+<div class="table-responsive" style="background:rgba(255,255,255,0.92); border-radius:1.5rem; box-shadow:0 2px 16px 0 #a1c4fd22; padding:1.5rem 1rem;">
+<table class="table table-bordered align-middle bg-white rounded-4">
     <thead class="table-primary">
         <tr>
             <th>Kullanıcı Adı</th>
@@ -53,4 +52,10 @@
 </table>
 </div>
 {% endif %}
+
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('admin_user_certificates') }}">Kullanıcı Sertifikalarını Yönet</a>
+    </li>
+</ul>
 {% endblock %} 

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Belgelerim</h2>
+    
+    {% if certificates %}
+    <div class="row">
+        {% for certificate in certificates %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">{{ certificate.certificate_type.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        <strong>Belge Numarası:</strong> {{ certificate.certificate_number }}<br>
+                        <strong>Kategori:</strong> {{ certificate.certificate_type.category.name }}<br>
+                        <strong>Veriliş Tarihi:</strong> {{ certificate.issue_date.strftime('%d.%m.%Y') }}<br>
+                        <strong>Tamamlanan Kurslar:</strong>
+                    </p>
+                    <ul class="list-group list-group-flush">
+                        {% for course in certificate.courses %}
+                        <li class="list-group-item">{{ course.title }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('view_certificate', certificate_id=certificate.id) }}" class="btn btn-primary">Belgeyi Görüntüle</a>
+                    {% if certificate.certificate_file %}
+                        <a href="{{ url_for('static', filename='uploads/' ~ certificate.certificate_file) }}" class="btn btn-success" target="_blank">Sertifika Dosyasını İndir/Görüntüle</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        Henüz hiç belgeniz bulunmamaktadır. Belgeler, kursları başarıyla tamamladığınızda otomatik olarak oluşturulacaktır.
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

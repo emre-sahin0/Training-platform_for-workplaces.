@@ -47,16 +47,17 @@
                     </a>
                 {% elif is_last_video %}
                     {% if progress and progress.completed %}
-                        {% if test_completed is not none %}
-                            {% if not test_completed %}
-                                {% if test_pdf or test_image %}
-                                    <a href="{{ url_for('pdf_test', course_id=video.course.id) }}" class="btn btn-success w-100">Teste Gir</a>
-                                {% endif %}
+                        {% set course = video.course %}
+                        {% set completed_count = course.videos|selectattr('id', 'in', current_user.progress|selectattr('completed', 'equalto', True)|map(attribute='video_id')|list)|list|length %}
+                        {% set total_count = course.videos|length %}
+                        {% if (course.test_pdf or course.test_images) and course.test_question_count and course.test_answer_key and completed_count == total_count and total_count > 0 %}
+                            {% set last_video = course.videos|sort(attribute='order')|last %}
+                            {% set test_progress = (current_user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
+                            {% if not test_progress or not test_progress.test_completed %}
+                                <a href="{{ url_for('pdf_test', course_id=course.id) }}" class="btn btn-success w-100">Teste Gir</a>
                             {% else %}
-                                <button id="finishTrainingBtn" class="btn btn-success w-100">Kursu Bitir</button>
+                                <div class="alert alert-success mt-2">Testi tamamladınız. Tekrar giremezsiniz.</div>
                             {% endif %}
-                        {% else %}
-                            <button id="finishTrainingBtn" class="btn btn-success w-100">Kursu Bitir</button>
                         {% endif %}
                     {% endif %}
                 {% endif %}

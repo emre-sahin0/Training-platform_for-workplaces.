@@ -2,8 +2,6 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-4">Dashboard</h2>
-    
     <!-- DUYURULAR BAŞLANGIÇ -->
     {% if announcements %}
     <div class="mb-4">
@@ -54,13 +52,13 @@
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="text-muted">
-                                            {{ progress.completed }}/{{ progress.total }} completed
+                                            {{ progress.completed }}/{{ progress.total }} tamamlandı
                                         </span>
                                         <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-primary">
                                             {% if progress.completed == 0 %}
-                                                Start Course
+                                                Kursa Başla
                                             {% else %}
-                                                Continue Course
+                                                Kursa Devam Et
                                             {% endif %}
                                         </a>
                                     </div>
@@ -71,7 +69,7 @@
                     </div>
                 {% else %}
                     <div class="alert alert-info mb-0">
-                        No courses available at the moment.
+                        Şu anda mevcut kurs yok.
                     </div>
                 {% endif %}
             </div>

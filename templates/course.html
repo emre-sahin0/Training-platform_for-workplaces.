@@ -171,7 +171,7 @@
 </div>
 {% endif %}
 
-{% if not current_user.is_admin and course.test_pdf and course.test_question_count and course.test_answer_key %}
+{% if not current_user.is_admin and (course.test_pdf or course.test_images) and course.test_question_count and course.test_answer_key %}
     {% set last_video = course.videos|sort(attribute='order')|last %}
     {% set progress = (current_user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
     {% set completed_count = course.videos|selectattr('id', 'in', current_user.progress|selectattr('completed', 'equalto', True)|map(attribute='video_id')|list)|list|length %}

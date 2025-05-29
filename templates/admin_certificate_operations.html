@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Sertifika İşlemleri</h2>
+    <form method="get" action="{{ url_for('admin_certificate_operations') }}" class="mb-4 card p-3">
+        <div class="row align-items-end">
+            <div class="col-md-6">
+                <label class="form-label">Kurs Seç</label>
+                <select class="form-select" name="course_id" required onchange="this.form.submit()">
+                    <option value="">Kurs Seçin</option>
+                    {% for course in courses %}
+                    <option value="{{ course.id }}" {% if selected_course and course.id == selected_course.id %}selected{% endif %}>{{ course.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </form>
+    {% if selected_course %}
+    <form method="POST" enctype="multipart/form-data" class="card p-4 mb-4">
+        <div class="mb-3">
+            <label class="form-label">Kursu Tamamlayan Kullanıcılar</label>
+            {% if eligible_users %}
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;"></th>
+                            <th>Ad Soyad</th>
+                            <th>Kullanıcı Adı</th>
+                            <th>Test Puanı</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in eligible_users %}
+                        <tr>
+                            <td><input type="checkbox" name="user_ids" value="{{ user.id }}"></td>
+                            <td>{{ user.first_name }} {{ user.last_name }}</td>
+                            <td>{{ user.username }}</td>
+                            {% set last_video = selected_course.videos|sort(attribute='order')|last %}
+                            {% set progress = (user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
+                            <td>{% if progress and progress.test_score is not none %}{{ progress.test_score }}{% else %}-{% endif %}</td>
+                            <td>{% if progress and progress.test_completed %}<span class="badge bg-success">Geçti</span>{% else %}<span class="badge bg-danger">Kaldı</span>{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <small class="text-muted">İstediğiniz kullanıcı(lar)ı seçebilirsiniz.</small>
+            {% else %}
+            <div class="alert alert-warning">Bu kursu henüz tamamlayan kullanıcı yok.</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Belge Türü</label>
+            {% set filtered_types = certificate_types|selectattr('category_id', 'equalto', selected_course.category_id)|list %}
+            {% if filtered_types %}
+            <select class="form-select" name="certificate_type_id" required>
+                <option value="">Belge Türü Seçin</option>
+                {% for cert_type in filtered_types %}
+                <option value="{{ cert_type.id }}">{{ cert_type.name }} ({{ cert_type.category.name }})</option>
+                {% endfor %}
+            </select>
+            {% else %}
+            <div class="alert alert-danger">Bu kursun kategorisine ait hiç belge türü yok. Lütfen önce <b>Belge Türleri</b> bölümünden ekleyin.</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Sertifika Dosyası (PDF, JPG, PNG...)</label>
+            <input type="file" class="form-control" name="certificate_file" accept="application/pdf,image/*" required>
+        </div>
+        <button type="submit" class="btn btn-success" {% if not eligible_users or not filtered_types %}disabled{% endif %}>Sertifika Gönder</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %} 

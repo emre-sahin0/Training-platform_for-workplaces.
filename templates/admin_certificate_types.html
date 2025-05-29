@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Belge Türleri Yönetimi</h2>
+    
+    <!-- Yeni Belge Türü Ekleme Formu -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Yeni Belge Türü Ekle</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Belge Türü Adı</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Açıklama</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="category_id" class="form-label">Kategori</label>
+                    <select class="form-control" id="category_id" name="category_id" required>
+                        <option value="">Kategori Seçin</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="required_course_count" class="form-label">Gerekli Minimum Kurs Sayısı</label>
+                    <input type="number" class="form-control" id="required_course_count" name="required_course_count" min="1" value="1" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Belge Türü Ekle</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mevcut Belge Türleri Listesi -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Mevcut Belge Türleri</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Belge Türü Adı</th>
+                            <th>Açıklama</th>
+                            <th>Kategori</th>
+                            <th>Gerekli Kurs Sayısı</th>
+                            <th>Kurs Sayısı</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cert_type in certificate_types %}
+                        <tr>
+                            <td>{{ cert_type.id }}</td>
+                            <td>{{ cert_type.name }}</td>
+                            <td>{{ cert_type.description }}</td>
+                            <td>{{ cert_type.category.name }}</td>
+                            <td>{{ cert_type.required_course_count }}</td>
+                            <td>{{ cert_type.courses|length }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

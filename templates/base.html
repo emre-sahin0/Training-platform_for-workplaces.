@@ -3,79 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>İş Sağlığı ve Güvenliği Eğitim Platformu</title>
+    <title>AdaWall Eğitim Platformu</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
-<body style="min-height:100vh; background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);">
-    <nav class="navbar navbar-expand-lg navbar-dark shadow-lg" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%); border-radius:0 0 2rem 2rem;">
-        <div class="container">
-            <a class="navbar-brand fw-bold" style="font-size:1.5rem; letter-spacing:1px; text-shadow:0 2px 8px #6a82fb99;" href="{{ url_for('index') }}">İSG Eğitim</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto gap-1">
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link nav-glass" href="{{ url_for('dashboard') }}">Panel</a>
-                        </li>
-                        {% if current_user.is_admin %}
-                            <li class="nav-item">
-                                <a class="nav-link nav-glass" href="{{ url_for('new_course') }}">Yeni Kurs</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link nav-glass" href="{{ url_for('admin_reports') }}">Raporlar</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link nav-glass" href="{{ url_for('admin_users') }}">Kullanıcılar</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link nav-glass" href="{{ url_for('admin_courses') }}">Kurslar</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link nav-glass" href="{{ url_for('admin_announcements') }}">Duyurular</a>
-                            </li>
-                        {% endif %}
-                        <li class="nav-item">
-                            <a class="nav-link nav-glass" href="{{ url_for('profile') }}">Profilim</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-glass" href="{{ url_for('logout') }}">Çıkış</a>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link nav-glass" href="{{ url_for('login') }}">Giriş</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-glass" href="{{ url_for('register') }}">Kayıt Ol</a>
-                        </li>
-                    {% endif %}
-                </ul>
+<body style="min-height:100vh; background: linear-gradient(120deg, #f8fafc 0%, #e0eafc 100%);">
+    <!-- Sade üst navbar -->
+    <nav class="navbar navbar-dark shadow-lg" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%); border-radius:0 0 2rem 2rem; min-height:64px;">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                {% if current_user.is_authenticated %}
+                    <button class="btn btn-outline-light me-2" id="sidebarToggle" style="font-size:1.7rem;"><i class="bi bi-list"></i></button>
+                {% endif %}
+            </div>
+            <div class="flex-grow-1 d-flex justify-content-center align-items-center" style="min-width:0;">
+                <span class="fw-bold d-inline-flex align-items-center justify-content-center mx-auto" style="font-size:2.1rem; letter-spacing:1.5px; color:#fff; text-shadow:0 2px 8px #6a82fb99; font-family:'Segoe UI',Arial,sans-serif;">
+                    <img src="{{ url_for('static', filename='images/adalogo1.png') }}" alt="Ada Eğitim Logo" style="height:2.3rem; margin-right:0.7rem; vertical-align:middle;">
+                    <span style="font-style:italic; font-family:'Segoe UI Italic', 'Segoe UI', Arial, sans-serif;">Ada Eğitim</span>
+                </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                {% if current_user.is_authenticated %}
+                    <span class="text-white fw-semibold d-none d-lg-inline">{{ current_user.first_name }} {{ current_user.last_name }}</span>
+                    <a class="nav-link nav-glass d-flex align-items-center gap-1" href="{{ url_for('profile') }}"><i class="bi bi-person-circle"></i></a>
+                    <a class="nav-link nav-glass d-flex align-items-center gap-1" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i></a>
+                {% endif %}
             </div>
         </div>
     </nav>
-
-    <div class="container mt-4 main-glass p-4 rounded-4 shadow-lg">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-info alert-glass">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        {% block content %}{% endblock %}
+    <div class="d-flex" style="min-height:100vh;">
+        <!-- Sidebar -->
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <nav id="sidebarMenu" class="sidebar bg-white shadow-lg p-3 pt-4 d-flex flex-column" style="width:220px; min-width:180px; max-width:260px; transition:all 0.2s; z-index:1040;">
+            <a href="{{ url_for('dashboard') }}" class="sidebar-link mb-2 {% if request.endpoint=='dashboard' %}active{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Panel</a>
+            <a href="{{ url_for('admin_courses') }}" class="sidebar-link mb-2 {% if request.endpoint=='admin_courses' %}active{% endif %}"><i class="bi bi-journal-bookmark me-2"></i>Tüm Kurslar</a>
+            <a href="{{ url_for('new_course') }}" class="sidebar-link mb-2 {% if request.endpoint=='new_course' %}active{% endif %}"><i class="bi bi-plus-circle me-2"></i>Yeni Kurs</a>
+            <a href="{{ url_for('admin_reports') }}" class="sidebar-link mb-2 {% if request.endpoint=='admin_reports' %}active{% endif %}"><i class="bi bi-bar-chart me-2"></i>Raporlar</a>
+            <a href="{{ url_for('admin_users') }}" class="sidebar-link mb-2 {% if request.endpoint=='admin_users' %}active{% endif %}"><i class="bi bi-people me-2"></i>Kullanıcılar</a>
+            <a href="{{ url_for('admin_announcements') }}" class="sidebar-link mb-2 {% if request.endpoint=='admin_announcements' %}active{% endif %}"><i class="bi bi-megaphone me-2"></i>Duyurular</a>
+            <hr>
+            <a href="{{ url_for('admin_certificate_operations') }}" class="sidebar-link mb-2 {% if request.endpoint=='admin_certificate_operations' %}active{% endif %}"><i class="bi bi-award me-2"></i>Sertifika Gönder</a>
+            <a href="{{ url_for('admin_user_certificates') }}" class="sidebar-link mb-2 {% if request.endpoint=='admin_user_certificates' %}active{% endif %}"><i class="bi bi-file-earmark-medical me-2"></i>Kullanıcı Sertifikalarını Yönet</a>
+        </nav>
+        {% elif current_user.is_authenticated %}
+        <nav id="sidebarMenu" class="sidebar bg-white shadow-lg p-3 pt-4 d-flex flex-column" style="width:220px; min-width:180px; max-width:260px; transition:all 0.2s; z-index:1040;">
+            <a href="{{ url_for('dashboard') }}" class="sidebar-link mb-2 {% if request.endpoint=='dashboard' %}active{% endif %}"><i class="bi bi-journal-bookmark me-2"></i>Kurslarım</a>
+            <a href="{{ url_for('user_certificates') }}" class="sidebar-link mb-2 {% if request.endpoint=='user_certificates' %}active{% endif %}"><i class="bi bi-patch-check me-2"></i>Sertifikalarım</a>
+            <a href="{{ url_for('profile') }}" class="sidebar-link mb-2 {% if request.endpoint=='profile' %}active{% endif %}"><i class="bi bi-person-circle me-2"></i>Profilim</a>
+        </nav>
+        {% endif %}
+        <!-- Ana içerik -->
+        <div class="flex-grow-1" style="min-width:0;">
+            <div class="container mt-4 main-glass p-4 rounded-4 shadow-lg">
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-glass">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                {% block content %}{% endblock %}
+            </div>
+        </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    {% block scripts %}{% endblock %}
+    <script>
+    // Sidebar toggle (her ekranda)
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebarMenu');
+        const toggleBtn = document.getElementById('sidebarToggle');
+        if(toggleBtn && sidebar) {
+            toggleBtn.addEventListener('click', function() {
+                sidebar.classList.toggle('active');
+            });
+        }
+    });
+    </script>
     <style>
-    body {
-        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-        background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
+    .sidebar {
+        min-height: 100vh;
+        border-radius: 0 2rem 2rem 0;
+        background: #fff;
+        box-shadow: 2px 0 16px 0 #4f8cff22;
+    }
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        font-weight: 500;
+        font-size: 1.08rem;
+        color: #4f8cff;
+        background: rgba(76,140,255,0.07);
+        border-radius: 0.8rem;
+        padding: 0.7rem 1.1rem;
+        margin-bottom: 0.2rem;
+        text-decoration: none;
+        transition: background 0.18s, color 0.18s;
+    }
+    .sidebar-link.active, .sidebar-link:hover {
+        background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%);
+        color: #fff !important;
+        box-shadow: 0 2px 8px 0 #4f8cff22;
+    }
+    @media (max-width: 991px) {
+        #sidebarMenu {
+            display: none !important;
+            position: absolute;
+            left: 0;
+            top: 60px;
+            z-index: 2000;
+        }
+        #sidebarMenu.active {
+            display: block !important;
+        }
     }
     .main-glass {
         background: rgba(255,255,255,0.7);
@@ -86,11 +127,12 @@
     }
     .nav-glass {
         border-radius: 1rem;
-        padding: 0.5rem 1.2rem;
-        margin: 0 0.2rem;
+        padding: 0.35rem 0.8rem;
+        margin: 0 0.08rem;
         background: rgba(255,255,255,0.10);
         transition: background 0.2s, color 0.2s;
         font-weight: 500;
+        white-space: nowrap;
     }
     .nav-glass:hover, .nav-glass.active, .navbar-nav .nav-link.active {
         background: linear-gradient(90deg, #a1c4fd 0%, #c2e9fb 100%);
