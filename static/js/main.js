@@ -1,25 +1,30 @@
-// Video player controls
+// Video player controls - Sadece geri sarma izinli
 document.addEventListener('DOMContentLoaded', function() {
     const videoPlayer = document.getElementById('videoPlayer');
     if (videoPlayer) {
-        // Prevent right-click
-        videoPlayer.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
-
-        // Prevent keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.target === videoPlayer) {
-                if (e.key === ' ' || e.key === 'k' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                    e.preventDefault();
+        let maxWatchedTime = 0; // Kullanıcının en fazla izlediği süre
+        
+        console.log('Video player: Sadece geri sarma izinli!');
+        
+        // Video oynarken maksimum izlenen süreyi takip et
+        videoPlayer.addEventListener('timeupdate', function() {
+            if (!videoPlayer.seeking) {
+                // Video normal oynarken, maksimum süreyi güncelle
+                if (videoPlayer.currentTime > maxWatchedTime) {
+                    maxWatchedTime = videoPlayer.currentTime;
                 }
             }
         });
-
-        // Prevent seeking
-        videoPlayer.addEventListener('seeking', function(e) {
-            if (videoPlayer.currentTime < videoPlayer.duration - 1) {
-                videoPlayer.currentTime = videoPlayer.duration - 1;
+        
+        // Seeking kontrolü: sadece geri sarmaya izin ver
+        videoPlayer.addEventListener('seeking', function() {
+            if (videoPlayer.currentTime > maxWatchedTime) {
+                // İleri sarma engelle - maksimum izlenen yere geri döndür
+                videoPlayer.currentTime = maxWatchedTime;
+                console.log('İleri sarma engellendi! Maksimum süre:', maxWatchedTime);
+            } else {
+                // Geri sarma izinli
+                console.log('Geri sarma izinli:', videoPlayer.currentTime);
             }
         });
     }

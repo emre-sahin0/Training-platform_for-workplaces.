@@ -335,4 +335,127 @@ h2, h3, h4, h5 {
 .badge.bg-warning {
     background: linear-gradient(90deg, #ffb347 0%, #ffcc80 100%) !important;
     color: #212529 !important;
+}
+
+/* MODERN SIDEBAR STYLES */
+#sidebarMenu {
+    width: 280px !important;
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%) !important;
+    min-height: 100vh !important;
+    padding: 25px 0 !important;
+    box-shadow: 5px 0 20px rgba(0,0,0,0.3) !important;
+    border-right: none !important;
+    position: relative !important;
+    z-index: 1000 !important;
+}
+
+#sidebarMenu::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #ff6b6b 0%, #4ecdc4 50%, #45b7d1 100%) !important;
+    box-shadow: 0 2px 10px rgba(79, 140, 255, 0.4);
+}
+
+.sidebar-link {
+    display: block !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    padding: 18px 30px !important;
+    margin: 8px 20px !important;
+    border-radius: 15px !important;
+    background: rgba(22, 33, 62, 0.8) !important;
+    border-left: 4px solid #4ecdc4 !important;
+    transition: all 0.3s ease !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+.sidebar-link:nth-child(3) { border-left-color: #4ecdc4 !important; }
+.sidebar-link:nth-child(4) { border-left-color: #45b7d1 !important; }
+.sidebar-link:nth-child(5) { border-left-color: #96ceb4 !important; }
+.sidebar-link:nth-child(6) { border-left-color: #feca57 !important; }
+.sidebar-link:nth-child(7) { border-left-color: #ff9ff3 !important; }
+.sidebar-link:nth-child(8) { border-left-color: #ff6b6b !important; }
+.sidebar-link:nth-child(10) { border-left-color: #54a0ff !important; }
+.sidebar-link:nth-child(11) { border-left-color: #5f27cd !important; }
+
+.sidebar-link i {
+    margin-right: 15px !important;
+    font-size: 1.2rem !important;
+    width: 25px !important;
+    text-align: center !important;
+}
+
+.sidebar-link:nth-child(3) i { color: #4ecdc4 !important; }
+.sidebar-link:nth-child(4) i { color: #45b7d1 !important; }
+.sidebar-link:nth-child(5) i { color: #96ceb4 !important; }
+.sidebar-link:nth-child(6) i { color: #feca57 !important; }
+.sidebar-link:nth-child(7) i { color: #ff9ff3 !important; }
+.sidebar-link:nth-child(8) i { color: #ff6b6b !important; }
+.sidebar-link:nth-child(10) i { color: #54a0ff !important; }
+.sidebar-link:nth-child(11) i { color: #5f27cd !important; }
+
+.sidebar-link:hover {
+    background: linear-gradient(135deg, #0f1419 0%, #1a1a2e 100%) !important;
+    transform: translateX(12px) scale(1.02) !important;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+}
+
+.sidebar-divider {
+    height: 2px !important;
+    background: linear-gradient(90deg, transparent 0%, rgba(79, 140, 255, 0.4) 50%, transparent 100%) !important;
+    margin: 30px 25px !important;
+    border: none !important;
+    border-radius: 2px !important;
+}
+
+/* Responsive sidebar */
+@media (max-width: 991px) {
+    #sidebarMenu {
+        display: none !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 70px !important;
+        z-index: 2000 !important;
+        width: 300px !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.4) !important;
+        transform: translateX(-100%) !important;
+        transition: transform 0.3s ease !important;
+    }
+    #sidebarMenu.active {
+        display: block !important;
+        transform: translateX(0) !important;
+    }
+}
+
+/* Desktop'ta sidebar her zaman görünür */
+@media (min-width: 992px) {
+    #sidebarMenu {
+        display: block !important;
+        position: relative !important;
+        transform: translateX(0) !important;
+    }
+    
+    /* Desktop'ta hamburger butonunu gizle */
+    #sidebarToggle {
+        display: none !important;
+    }
+}
+
+/* Hamburger buton animasyonu */
+#sidebarToggle {
+    transition: all 0.3s ease !important;
+    border: 2px solid rgba(255,255,255,0.3) !important;
+}
+
+#sidebarToggle:hover {
+    background: rgba(255,255,255,0.2) !important;
+    border: 2px solid rgba(255,255,255,0.5) !important;
+    transform: scale(1.05) !important;
 } 

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 import os
@@ -8,6 +8,18 @@ from config import Config
 from models import db, login_manager, User, Course, Video, Test, Question, Option, Progress, Announcement, Category, CertificateType, Certificate
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import uuid
+from flask_talisman import Talisman
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField
+from wtforms.validators import DataRequired, Length, Regexp
+
+# Limiter nesnesini yeni sürüme uygun şekilde başlat
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
 
 def create_app():
     app = Flask(__name__)
@@ -17,22 +29,57 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = 'login'
 
+    # --- Güvenlik: Talisman ve Limiter ---
+    Talisman(app, content_security_policy={
+        'default-src': ["'self'", 'https://cdn.jsdelivr.net'],
+        'img-src': ["'self'", 'data:', 'https://cdn.jsdelivr.net'],
+        'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+    })
+    # Limiter'ı burada app ile başlat
+    limiter.init_app(app)
+
     return app
 
 app = create_app()
+
+# --- Giriş Formu (güçlü parola kontrolü için) ---
+class LoginForm(FlaskForm):
+    username = StringField('Kullanıcı Adı', validators=[DataRequired()])
+    password = PasswordField('Şifre', validators=[DataRequired()])
+
+# --- Kayıt/Şifre değiştir formunda parola politikası ---
+password_policy = [
+    Length(min=8, message='Şifre en az 8 karakter olmalı.'),
+    Regexp(r'.*[A-Z].*', message='Şifre en az bir büyük harf içermeli.'),
+    Regexp(r'.*[a-z].*', message='Şifre en az bir küçük harf içermeli.'),
+    Regexp(r'.*[0-9].*', message='Şifre en az bir rakam içermeli.'),
+    Regexp(r'.*[^A-Za-z0-9].*', message='Şifre en az bir özel karakter içermeli.')
+]
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
     if request.method == 'POST':
-        user = User.query.filter_by(username=request.form.get('username')).first()
-        if user and user.check_password(request.form.get('password')):
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Kullanıcı adı ve şifre zorunludur.', 'danger')
+            return render_template('login.html')
+            
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('dashboard'))
-        flash('Kullanıcı adı veya şifre hatalı')
+        else:
+            flash('Kullanıcı adı veya şifre hatalı!', 'danger')
+            return render_template('login.html')
+    
     return render_template('login.html')
 
 @app.route('/logout')
@@ -315,16 +362,91 @@ def generate_report():
 @app.route('/video/<int:video_id>/complete', methods=['POST'])
 @login_required
 def complete_video(video_id):
+    print(f"DEBUG: Video complete called for video_id: {video_id}")
+    
+    video = Video.query.get_or_404(video_id)
+    print(f"DEBUG: Video found: {video.title}")
+    
     progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
     if not progress:
         progress = Progress(user_id=current_user.id, video_id=video_id)
         db.session.add(progress)
+        print(f"DEBUG: Created new progress for user {current_user.id}")
     
     progress.completed = True
     progress.completed_at = datetime.utcnow()
     db.session.commit()
+    print(f"DEBUG: Progress marked as completed")
     
-    return {'success': True}
+    # Bir sonraki videoyu veya testi kontrol et
+    course = video.course
+    print(f"DEBUG: Course: {course.title}")
+    
+    # Mevcut videonun order'ına göre bir sonraki videoyu bul
+    videos = sorted(course.videos, key=lambda v: v.order)
+    print(f"DEBUG: Total videos in course: {len(videos)}")
+    
+    current_index = next((i for i, v in enumerate(videos) if v.id == video_id), -1)
+    print(f"DEBUG: Current video index: {current_index}")
+    
+    if current_index >= 0 and current_index < len(videos) - 1:
+        # Bir sonraki video var
+        next_video = videos[current_index + 1]
+        print(f"DEBUG: Next video found: {next_video.title}")
+        return jsonify({
+            'success': True, 
+            'next_url': url_for('video', video_id=next_video.id),
+            'message': 'Bir sonraki videoya geçiliyor...'
+        })
+    else:
+        print(f"DEBUG: This is the last video, checking for test...")
+        # Son video, test var mı kontrol et
+        completed_count = Progress.query.filter_by(
+            user_id=current_user.id, 
+            completed=True
+        ).join(Video).filter(Video.course_id == course.id).count()
+        
+        total_count = len(course.videos)
+        print(f"DEBUG: Completed videos: {completed_count}/{total_count}")
+        
+        has_test = bool((course.test_pdf or course.test_images) and course.test_question_count and course.test_answer_key)
+        print(f"DEBUG: Course has test: {has_test}")
+        
+        if has_test and completed_count == total_count:
+            # Test var ve tüm videolar tamamlandı
+            last_video = videos[-1] if videos else None
+            test_progress = Progress.query.filter_by(
+                user_id=current_user.id, 
+                video_id=last_video.id
+            ).first() if last_video else None
+            
+            test_completed = test_progress and test_progress.test_completed
+            print(f"DEBUG: Test already completed: {test_completed}")
+            
+            if not test_completed:
+                print(f"DEBUG: Redirecting to test")
+                return jsonify({
+                    'success': True,
+                    'next_url': url_for('pdf_test', course_id=course.id),
+                    'message': 'Teste yönlendiriliyorsunuz...'
+                })
+            else:
+                print(f"DEBUG: Test already completed, going to dashboard")
+                return jsonify({
+                    'success': True,
+                    'next_url': url_for('dashboard'),
+                    'message': 'Kurs tamamlandı! Ana panele dönülüyor...'
+                })
+        else:
+            print(f"DEBUG: No test or not all videos completed, going to dashboard")
+            return jsonify({
+                'success': True,
+                'next_url': url_for('dashboard'),
+                'message': 'Kurs tamamlandı! Ana panele dönülüyor...'
+            })
+    
+    print(f"DEBUG: Fallback return")
+    return jsonify({'success': True})
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -339,29 +461,47 @@ def register():
         admin_password = request.form.get('admin_password')
 
         if not username or not email or not password or not confirm or not first_name or not last_name:
-            flash('Tüm alanları doldurun.')
+            flash('Tüm alanları doldurun.', 'danger')
             return render_template('register.html')
         if password != confirm:
-            flash('Şifreler eşleşmiyor.')
+            flash('Şifreler eşleşmiyor.', 'danger')
             return render_template('register.html')
+            
+        # Güçlü şifre kontrolü
+        if len(password) < 8:
+            flash('Şifre en az 8 karakter olmalı.', 'danger')
+            return render_template('register.html')
+        if not any(c.isupper() for c in password):
+            flash('Şifre en az bir büyük harf içermeli.', 'danger')
+            return render_template('register.html')
+        if not any(c.islower() for c in password):
+            flash('Şifre en az bir küçük harf içermeli.', 'danger')
+            return render_template('register.html')
+        if not any(c.isdigit() for c in password):
+            flash('Şifre en az bir rakam içermeli.', 'danger')
+            return render_template('register.html')
+        if not any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+            flash('Şifre en az bir özel karakter içermeli (!@#$%^&* vb.).', 'danger')
+            return render_template('register.html')
+            
         if User.query.filter_by(username=username).first():
-            flash('Bu kullanıcı adı zaten alınmış.')
+            flash('Bu kullanıcı adı zaten alınmış.', 'danger')
             return render_template('register.html')
         if User.query.filter_by(email=email).first():
-            flash('Bu e-posta zaten kayıtlı.')
+            flash('Bu e-posta zaten kayıtlı.', 'danger')
             return render_template('register.html')
         
-        # Admin şifre kontrolü
+        # Admin şifre kontrolü - SADECE admin olarak kayıt olunuyorsa
         if is_admin:
             if not admin_password or admin_password != app.config['ADMIN_REGISTRATION_KEY']:
-                flash('Geçersiz admin kayıt şifresi.')
+                flash('Geçersiz admin kayıt şifresi.', 'danger')
                 return render_template('register.html')
 
         user = User(username=username, email=email, first_name=first_name, last_name=last_name, is_admin=is_admin)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-        flash('Kayıt başarılı! Giriş yapabilirsiniz.')
+        flash('Kayıt başarılı! Giriş yapabilirsiniz.', 'success')
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -867,6 +1007,15 @@ def download_multi_report():
 @login_required
 def pdf_test(course_id):
     course = Course.query.get_or_404(course_id)
+    
+    # Test daha önce tamamlanmış mı kontrol et
+    last_video = Video.query.filter_by(course_id=course_id).order_by(Video.order.desc()).first()
+    if last_video:
+        existing_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
+        if existing_progress and existing_progress.test_completed:
+            flash(f'Bu testi daha önce tamamladınız! Sonuç: %{existing_progress.test_score}', 'info')
+            return redirect(url_for('course', course_id=course_id))
+    
     # Test dosyası tipi ve adı
     test_file_type = None
     test_file_name = None
@@ -891,17 +1040,23 @@ def pdf_test(course_id):
                 correct += 1
         percent = int((correct / course.test_question_count) * 100)
         # Sonucu Progress'e kaydet (son video üzerinden)
-        last_video = Video.query.filter_by(course_id=course_id).order_by(Video.order.desc()).first()
         if last_video:
             progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
             if not progress:
                 progress = Progress(user_id=current_user.id, video_id=last_video.id)
                 db.session.add(progress)
             progress.test_score = percent
-            progress.test_completed = percent >= (course.passing_score or 70)
+            progress.test_completed = True  # Test tamamlandı olarak işaretle
             progress.completed_at = datetime.utcnow()
             db.session.commit()
-        flash(f'Test tamamlandı! Başarı: %{percent}')
+            
+            # Başarı durumuna göre mesaj
+            passing_score = course.passing_score or 70
+            if percent >= passing_score:
+                flash(f'Tebrikler! Testi başarıyla geçtiniz. Sonuç: %{percent} (Geçme notu: %{passing_score})', 'success')
+            else:
+                flash(f'Test tamamlandı ancak geçeme notunu karşılayamadınız. Sonuç: %{percent} (Geçme notu: %{passing_score})', 'warning')
+        
         return redirect(url_for('course', course_id=course_id))
 
     return render_template('pdf_test.html', course=course, test_file_type=test_file_type, test_file_name=test_file_name)

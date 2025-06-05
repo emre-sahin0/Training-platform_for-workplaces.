@@ -42,7 +42,7 @@
                         <input type="password" class="form-control" id="admin_password" name="admin_password">
                         <div class="form-text">Admin olarak kayıt olmak için özel şifre gereklidir.</div>
                         <div class="form-text text-danger" id="adminPasswordError" style="display: none;">
-                            Geçersiz admin şifresi!
+                            Admin kayıt şifresi gereklidir!
                         </div>
                     </div>
                     <div class="d-grid">
@@ -56,29 +56,84 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-document.getElementById('is_admin').addEventListener('change', function() {
-    var adminPasswordField = document.querySelector('.admin-password-field');
-    var adminPasswordInput = document.getElementById('admin_password');
-    adminPasswordField.style.display = this.checked ? 'block' : 'none';
-    if (!this.checked) {
-        adminPasswordInput.value = '';
-    }
-});
-
-document.getElementById('registerForm').addEventListener('submit', function(e) {
-    var isAdmin = document.getElementById('is_admin').checked;
-    var adminPassword = document.getElementById('admin_password').value;
-    var adminPasswordError = document.getElementById('adminPasswordError');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Sayfa yüklendi, JavaScript çalışıyor!');
     
-    if (isAdmin && !adminPassword) {
-        e.preventDefault();
-        adminPasswordError.style.display = 'block';
-    } else {
+    // Sayfa yüklendiğinde admin şifre alanını gizle
+    var adminPasswordField = document.querySelector('.admin-password-field');
+    var adminPasswordError = document.getElementById('adminPasswordError');
+    var adminCheckbox = document.getElementById('is_admin');
+    
+    console.log('Elementler bulundu:', {
+        adminPasswordField: adminPasswordField,
+        adminPasswordError: adminPasswordError,
+        adminCheckbox: adminCheckbox
+    });
+    
+    if (adminPasswordField) {
+        adminPasswordField.style.display = 'none';
+    }
+    if (adminPasswordError) {
         adminPasswordError.style.display = 'none';
+    }
+
+    // Admin checkbox için event listener
+    if (adminCheckbox) {
+        adminCheckbox.addEventListener('change', function() {
+            console.log('Checkbox değişti! Checked:', this.checked);
+            var adminPasswordInput = document.getElementById('admin_password');
+            
+            if (this.checked) {
+                console.log('Admin alanı açılıyor...');
+                adminPasswordField.style.display = 'block';
+                if (adminPasswordInput) {
+                    adminPasswordInput.setAttribute('required', 'required');
+                }
+            } else {
+                console.log('Admin alanı kapatılıyor...');
+                adminPasswordField.style.display = 'none';
+                if (adminPasswordInput) {
+                    adminPasswordInput.removeAttribute('required');
+                    adminPasswordInput.value = '';
+                }
+                if (adminPasswordError) {
+                    adminPasswordError.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // Form submit kontrolü
+    var registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(e) {
+            console.log('Form submit edildi!');
+            var isAdmin = adminCheckbox ? adminCheckbox.checked : false;
+            var adminPasswordInput = document.getElementById('admin_password');
+            var adminPassword = adminPasswordInput ? adminPasswordInput.value : '';
+            
+            console.log('Submit sırasında:', {
+                isAdmin: isAdmin,
+                adminPassword: adminPassword
+            });
+            
+            // SADECE admin checkbox işaretliyse ve şifre boşsa hata göster
+            if (isAdmin && (!adminPassword || adminPassword.trim() === '')) {
+                console.log('Admin şifre hatası gösteriliyor');
+                e.preventDefault();
+                if (adminPasswordError) {
+                    adminPasswordError.style.display = 'block';
+                    adminPasswordError.textContent = 'Admin kayıt şifresi gereklidir!';
+                }
+            } else {
+                console.log('Form normal şekilde submit ediliyor');
+                if (adminPasswordError) {
+                    adminPasswordError.style.display = 'none';
+                }
+            }
+        });
     }
 });
 </script>

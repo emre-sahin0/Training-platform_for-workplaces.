@@ -67,11 +67,13 @@
 </div>
 
 <style>
-/* Seek bar ve ileri/geri sarma butonlarını tamamen gizle, süre ve oynat/durdur görünsün */
-video::-webkit-media-controls-timeline,
+/* Video kontrollerini serbest bırak - kullanıcı istediği gibi kullanabilsin */
+video::-webkit-media-controls-timeline {
+    display: block !important;
+}
 video::-webkit-media-controls-seek-back-button,
 video::-webkit-media-controls-seek-forward-button {
-    display: none !important;
+    display: block !important;
 }
 video::-webkit-media-controls-current-time-display,
 video::-webkit-media-controls-time-remaining-display,
@@ -89,45 +91,67 @@ document.addEventListener('DOMContentLoaded', function() {
     const video = document.getElementById('videoPlayer');
     const nextButton = document.getElementById('nextVideoBtn');
     const finishBtn = document.getElementById('finishTrainingBtn');
-    let lastTime = 0;
-    let allowSeek = true;
 
-    // Sadece ileri sarmayı engelle, geri sarmaya izin ver
-    video.addEventListener('timeupdate', function() {
-        if (!video.seeking) {
-            lastTime = video.currentTime;
-        }
-    });
-    video.addEventListener('seeking', function() {
-        if (video.currentTime > lastTime + 0.5) {
-            allowSeek = false;
-            video.currentTime = lastTime;
-            setTimeout(() => {
-                if (video.paused) video.play();
-            }, 100);
-        } else {
-            allowSeek = true;
-        }
-    });
-    video.addEventListener('seeked', function() {
-        if (!allowSeek) {
-            allowSeek = true;
-        }
-    });
+    console.log('Video player initialized, seeking is now allowed');
 
     // Video bittiğinde
     video.addEventListener('ended', function() {
+        console.log('Video ended, starting completion process...');
+        
+        // Kullanıcıya bilgi ver
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'alert alert-info mt-3';
+        statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Video tamamlandı, işleniyor...';
+        video.parentNode.appendChild(statusDiv);
+        
+        console.log('Sending completion request to server...');
+        
         fetch('/video/{{ video.id }}/complete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.reload();
+        .then(response => {
+            console.log('Server response status:', response.status);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Server response data:', data);
+            if (data.success) {
+                if (data.next_url) {
+                    // Mesaj göster
+                    statusDiv.innerHTML = `<i class="bi bi-check-circle"></i> ${data.message || 'Yönlendiriliyor...'}`;
+                    statusDiv.className = 'alert alert-success mt-3';
+                    
+                    console.log('Redirecting to:', data.next_url);
+                    
+                    // 2 saniye bekle sonra yönlendir
+                    setTimeout(() => {
+                        console.log('Redirecting now...');
+                        window.location.href = data.next_url;
+                    }, 2000);
+                } else {
+                    // Sadece sayfayı yenile
+                    console.log('No next URL, reloading page...');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                }
+            } else {
+                console.error('Server returned success=false');
+                statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Sunucu hatası!';
+                statusDiv.className = 'alert alert-danger mt-3';
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Bağlantı hatası! Tekrar deneyin.';
+            statusDiv.className = 'alert alert-danger mt-3';
         });
     });
 
