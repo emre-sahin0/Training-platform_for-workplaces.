@@ -27,9 +27,8 @@
                         <th>ID</th>
                         <th>Sertifika Türü</th>
                         <th>Sertifika No</th>
-                        <th>Dosya</th>
-                        <th>Tarih</th>
-                        <th>İşlem</th>
+                        <th>Veriliş Tarihi</th>
+                        <th class="text-end">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,11 +37,20 @@
                         <td>{{ cert.id }}</td>
                         <td>{{ cert.certificate_type.name }}</td>
                         <td>{{ cert.certificate_number }}</td>
-                        <td>{% if cert.certificate_file %}<a href="{{ url_for('static', filename='uploads/' ~ cert.certificate_file) }}" target="_blank">Dosyayı Gör</a>{% else %}-{% endif %}</td>
                         <td>{{ cert.issue_date.strftime('%d.%m.%Y %H:%M') if cert.issue_date else '-' }}</td>
-                        <td>
-                            <form method="post" action="{{ url_for('admin_delete_certificate', certificate_id=cert.id) }}" onsubmit="return confirm('Bu sertifikayı silmek istediğinize emin misiniz?');">
-                                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+                        <td class="text-end">
+                            <a href="{{ url_for('download_certificate_pdf', certificate_id=cert.id) }}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-file-earmark-pdf"></i> PDF İndir
+                            </a>
+                            {% if cert.certificate_file %}
+                                <a href="{{ url_for('static', filename='uploads/' + cert.certificate_file) }}" target="_blank" class="btn btn-info btn-sm">
+                                    <i class="bi bi-file-earmark-arrow-down"></i> Yükleneni İndir
+                                </a>
+                            {% endif %}
+                            <form method="post" action="{{ url_for('admin_delete_certificate', certificate_id=cert.id) }}" onsubmit="return confirm('Bu sertifikayı silmek istediğinize emin misiniz?');" class="d-inline">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="bi bi-trash"></i> Sil
+                                </button>
                             </form>
                         </td>
                     </tr>

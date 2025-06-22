@@ -31,36 +31,62 @@
                 <h5 class="card-title">Eğitim Durumu</h5>
                 {% if progress and progress.completed %}
                     <div class="alert alert-success">
-                        Bu video tamamlandı!
+                        <i class="fas fa-check-circle"></i> Bu video tamamlandı!
                     </div>
                 {% else %}
                     <div class="alert alert-warning">
-                        Bu video henüz tamamlanmadı.
+                        <i class="fas fa-clock"></i> Video henüz tamamlanmadı.
                     </div>
                 {% endif %}
                 
-                {% if video.order < video.course.videos|length %}
-                    <a href="{{ url_for('video', video_id=video.course.videos[video.order].id) }}" 
-                       id="nextVideoBtn"
-                       class="btn btn-primary w-100 {% if not progress or not progress.completed %}disabled{% endif %}">
-                        Sonraki Video
-                    </a>
-                {% elif is_last_video %}
-                    {% if progress and progress.completed %}
-                        {% set course = video.course %}
-                        {% set completed_count = course.videos|selectattr('id', 'in', current_user.progress|selectattr('completed', 'equalto', True)|map(attribute='video_id')|list)|list|length %}
-                        {% set total_count = course.videos|length %}
-                        {% if (course.test_pdf or course.test_images) and course.test_question_count and course.test_answer_key and completed_count == total_count and total_count > 0 %}
-                            {% set last_video = course.videos|sort(attribute='order')|last %}
-                            {% set test_progress = (current_user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
-                            {% if not test_progress or not test_progress.test_completed %}
-                                <a href="{{ url_for('pdf_test', course_id=course.id) }}" class="btn btn-success w-100">Teste Gir</a>
-                            {% else %}
-                                <div class="alert alert-success mt-2">Testi tamamladınız. Tekrar giremezsiniz.</div>
-                            {% endif %}
+                <!-- Video bittiğinde görünecek tek buton -->
+                <div id="nextStepSection" style="{% if progress and progress.completed %}display: block;{% else %}display: none;{% endif %}">
+                    {% if next_url %}
+                        {% if 'pdf-test' in next_url %}
+                            <a href="{{ next_url }}" class="btn btn-warning btn-lg w-100 mb-3">
+                                <i class="fas fa-clipboard-check"></i> Kursu Bitirme Testine Git
+                            </a>
+                        {% else %}
+                            <a href="{{ next_url }}" class="btn btn-primary btn-lg w-100 mb-3">
+                                <i class="fas fa-arrow-right"></i> Sonraki Adıma Geç
+                            </a>
                         {% endif %}
+                    {% else %}
+                        <!-- Kurs tamamlandıysa dashboard'a git -->
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-lg w-100 mb-3">
+                            <i class="fas fa-trophy"></i> Ana Sayfaya Git
+                        </a>
                     {% endif %}
-                {% endif %}
+                    
+                    <!-- Önceki içeriğe git butonu (video tamamlandıktan sonra) -->
+                    {% if prev_url %}
+                        <a href="{{ prev_url }}" class="btn btn-outline-secondary w-100 mb-3">
+                            <i class="fas fa-arrow-left"></i> Önceki İçeriğe Git
+                        </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-outline-info w-100">
+                        <i class="fas fa-book"></i> Kurs Sayfasına Dön
+                    </a>
+                </div>
+
+                <!-- Normal navigasyon butonları (video tamamlanmamışken) -->
+                <div id="normalNavigation" style="{% if progress and progress.completed %}display: none;{% else %}display: block;{% endif %}">
+                    <!-- Sadece önceki içerik butonu (eğer varsa) -->
+                    {% if prev_url %}
+                        <a href="{{ prev_url }}" class="btn btn-outline-secondary w-100 mb-3">
+                            <i class="fas fa-arrow-left"></i> Önceki İçeriğe Git
+                        </a>
+                    {% endif %}
+
+                    <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-outline-info w-100">
+                        <i class="fas fa-book"></i> Kurs Sayfasına Dön
+                    </a>
+                    
+                    <div class="alert alert-info mt-3">
+                        <small><i class="fas fa-info-circle"></i> Videoyu sonuna kadar izleyin, ardından sonraki adıma geçebilirsiniz.</small>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -89,8 +115,6 @@ video::-webkit-media-controls-fullscreen-button {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const video = document.getElementById('videoPlayer');
-    const nextButton = document.getElementById('nextVideoBtn');
-    const finishBtn = document.getElementById('finishTrainingBtn');
 
     console.log('Video player initialized, seeking is now allowed');
 
@@ -101,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Kullanıcıya bilgi ver
         const statusDiv = document.createElement('div');
         statusDiv.className = 'alert alert-info mt-3';
-        statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Video tamamlandı, işleniyor...';
+        statusDiv.innerHTML = '<i class="fas fa-hourglass-half"></i> Video tamamlandı, işleniyor...';
         video.parentNode.appendChild(statusDiv);
         
         console.log('Sending completion request to server...');
@@ -123,44 +147,36 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             console.log('Server response data:', data);
             if (data.success) {
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Video kaydedildi!';
+                statusDiv.className = 'alert alert-success mt-3';
+                
+                // Eğer sunucudan next_url geliyorsa, o URL'ye yönlendir
                 if (data.next_url) {
-                    // Mesaj göster
-                    statusDiv.innerHTML = `<i class="bi bi-check-circle"></i> ${data.message || 'Yönlendiriliyor...'}`;
-                    statusDiv.className = 'alert alert-success mt-3';
-                    
-                    console.log('Redirecting to:', data.next_url);
-                    
-                    // 2 saniye bekle sonra yönlendir
                     setTimeout(() => {
-                        console.log('Redirecting now...');
                         window.location.href = data.next_url;
-                    }, 2000);
+                    }, 1500);
                 } else {
-                    // Sadece sayfayı yenile
-                    console.log('No next URL, reloading page...');
+                    // Normal navigasyonu gizle, tamamlanma butonlarını göster
+                    document.getElementById('normalNavigation').style.display = 'none';
+                    document.getElementById('nextStepSection').style.display = 'block';
+                    
+                    // Sayfayı yenile ki progress bar güncellensin
                     setTimeout(() => {
                         window.location.reload();
-                    }, 1000);
+                    }, 1500);
                 }
             } else {
                 console.error('Server returned success=false');
-                statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Sunucu hatası!';
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Sunucu hatası!';
                 statusDiv.className = 'alert alert-danger mt-3';
             }
         })
         .catch(error => {
             console.error('Fetch error:', error);
-            statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Bağlantı hatası! Tekrar deneyin.';
+            statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Bağlantı hatası! Tekrar deneyin.';
             statusDiv.className = 'alert alert-danger mt-3';
         });
     });
-
-    // Eğitimi Bitir butonuna tıklanınca ana panele yönlendir
-    if (finishBtn) {
-        finishBtn.addEventListener('click', function() {
-            window.location.href = '/dashboard';
-        });
-    }
 });
 </script>
 {% endblock %}

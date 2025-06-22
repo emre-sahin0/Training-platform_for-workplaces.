@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="mb-2">Kurs İlerleme Durumu</h5>
+                <div class="mb-1" style="font-weight: 500;">İlerleme: {{ completed_steps }}/{{ total_steps }} Aşama (%{{ progress_percent }})</div>
+                <div class="progress mb-2" style="height: 24px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress_percent }}%; font-weight: bold; font-size: 1rem;" aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body p-0" style="height: 70vh;">
+                <iframe src="{{ url_for('static', filename='uploads/' + pdf.pdf_path) }}" width="100%" height="100%" frameborder="0">
+                    Bu tarayıcı PDF'leri desteklemiyor. PDF'i <a href="{{ url_for('static', filename='uploads/' + pdf.pdf_path) }}">buradan</a> indirebilirsiniz.
+                </iframe>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ pdf.title }}</h5>
+                <div class="alert alert-info">
+                    <i class="fas fa-file-pdf"></i> PDF materyali görüntüleniyor
+                </div>
+                
+                <!-- Ana Aksiyon Butonu -->
+                {% if next_url %}
+                    {% if 'pdf-test' in next_url %}
+                        <a href="{{ next_url }}" class="btn btn-warning btn-lg w-100 mb-3">
+                            <i class="fas fa-clipboard-check"></i> Kursu Bitirme Testine Git
+                        </a>
+                    {% else %}
+                        <a href="{{ next_url }}" class="btn btn-primary btn-lg w-100 mb-3">
+                            <i class="fas fa-arrow-right"></i> Sonraki Adıma Geç
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <!-- Kurs tamamlandıysa dashboard'a git -->
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-lg w-100 mb-3">
+                        <i class="fas fa-trophy"></i> Ana Sayfaya Git
+                    </a>
+                {% endif %}
+                
+                <!-- Sadece Önceki butonu (eğer varsa) -->
+                {% if prev_url %}
+                    <a href="{{ prev_url }}" class="btn btn-outline-secondary w-100 mb-3">
+                        <i class="fas fa-arrow-left"></i> Önceki İçeriğe Git
+                    </a>
+                {% endif %}
+                
+                <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-outline-info w-100">
+                    <i class="fas fa-book"></i> Kurs Sayfasına Dön
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

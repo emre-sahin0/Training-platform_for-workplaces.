@@ -33,15 +33,25 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for user in eligible_users %}
+                        {% for item in eligible_users %}
                         <tr>
-                            <td><input type="checkbox" name="user_ids" value="{{ user.id }}"></td>
-                            <td>{{ user.first_name }} {{ user.last_name }}</td>
-                            <td>{{ user.username }}</td>
-                            {% set last_video = selected_course.videos|sort(attribute='order')|last %}
-                            {% set progress = (user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
-                            <td>{% if progress and progress.test_score is not none %}{{ progress.test_score }}{% else %}-{% endif %}</td>
-                            <td>{% if progress and progress.test_completed %}<span class="badge bg-success">Geçti</span>{% else %}<span class="badge bg-danger">Kaldı</span>{% endif %}</td>
+                            <td><input type="checkbox" name="user_ids" value="{{ item.user.id }}"></td>
+                            <td>{{ item.user.first_name }} {{ item.user.last_name }}</td>
+                            <td>{{ item.user.username }}</td>
+                            <td>
+                                {% if item.progress.test_score is not none %}
+                                    {{ item.progress.test_score }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.progress.is_completed %}
+                                    <span class="badge bg-success">Geçti</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Kaldı</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -67,10 +77,11 @@
             {% endif %}
         </div>
         <div class="mb-3">
-            <label class="form-label">Sertifika Dosyası (PDF, JPG, PNG...)</label>
-            <input type="file" class="form-control" name="certificate_file" accept="application/pdf,image/*" required>
+            <label class="form-label">Sertifika Dosyası (PDF, JPG, PNG...) <span class="text-muted">(İsteğe Bağlı)</span></label>
+            <input type="file" class="form-control" name="certificate_file" accept="application/pdf,image/*">
+            <small class="form-text text-muted">Eğer dosya yüklemezseniz, sistem otomatik olarak standart bir sertifika şablonu oluşturacaktır.</small>
         </div>
-        <button type="submit" class="btn btn-success" {% if not eligible_users or not filtered_types %}disabled{% endif %}>Sertifika Gönder</button>
+        <button type="submit" class="btn btn-success" {% if not eligible_users or not filtered_types %}disabled{% endif %}>Sertifika Ata</button>
     </form>
     {% endif %}
 </div>

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} - Kurs Yönetimi{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Panel</a></li>
+                    <li class="breadcrumb-item active">{{ course.title }} - Yönetim</li>
+                </ol>
+            </nav>
+            <h2><i class="fas fa-cog"></i> {{ course.title }} - Kurs Yönetimi</h2>
+        </div>
+    </div>
+
+    <!-- Hızlı İşlemler -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Tehlikeli İşlemler</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-2">
+                        <form action="{{ url_for('delete_course', course_id=course.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Bu kursu silmek istediğinize emin misiniz? Tüm videolar, PDF\'ler ve kullanıcı ilerlemeleri silinecek!');">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Kursu Tamamen Sil
+                            </button>
+                        </form>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Ana Panele Dön
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Kurs Bilgileri -->
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-edit"></i> Kurs Bilgilerini Düzenle</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="title" class="form-label">Kurs Başlığı</label>
+                                    <input type="text" class="form-control" id="title" name="title" value="{{ course.title }}" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="category_id" class="form-label">Kategori</label>
+                                    <select class="form-control" id="category_id" name="category_id">
+                                        <option value="">Kategori Seçin</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.id }}" {% if course.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="passing_score" class="form-label">Geçme Notu</label>
+                                    <input type="number" class="form-control" id="passing_score" name="passing_score" value="{{ course.passing_score or 70 }}" min="1" max="100">
+                                </div>
+                                
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" id="test_required" name="test_required" {% if course.test_required %}checked{% endif %}>
+                                    <label class="form-check-label" for="test_required">Test Zorunlu</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Açıklama</label>
+                                    <textarea class="form-control" id="description" name="description" rows="8">{{ course.description }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Değişiklikleri Kaydet
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kurs İçeriği -->
+    <div class="row mt-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-play-circle"></i> Kurs İçeriği</h5>
+                </div>
+                <div class="card-body">
+                    {% set content = [] %}
+                    {% for video in course.videos %}
+                        {% set _ = content.append({'type': 'video', 'data': video}) %}
+                    {% endfor %}
+                    {% for pdf in course.pdfs %}
+                        {% set _ = content.append({'type': 'pdf', 'data': pdf}) %}
+                    {% endfor %}
+                    {% set content = content|sort(attribute='data.order') %}
+                    
+                    {% if content %}
+                        <div class="list-group">
+                            {% for item in content %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">
+                                        {% if item.type == 'video' %}
+                                            <i class="fas fa-video text-primary"></i>
+                                        {% else %}
+                                            <i class="fas fa-file-pdf text-danger"></i>
+                                        {% endif %}
+                                        {{ item.data.title }}
+                                    </h6>
+                                    <small class="text-muted">Sıra: {{ item.data.order }}</small>
+                                </div>
+                                <div>
+                                    {% if item.type == 'video' %}
+                                        <a href="{{ url_for('video', video_id=item.data.id) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                            <i class="fas fa-play"></i> İzle
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for('pdf_viewer', pdf_id=item.data.id) }}" class="btn btn-sm btn-outline-danger" target="_blank">
+                                            <i class="fas fa-eye"></i> Görüntüle
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> Bu kursta henüz içerik bulunmuyor.
+                        </div>
+                    {% endif %}
+                    
+                    <div class="mt-3">
+                        <a href="{{ url_for('new_course') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-plus"></i> Yeni İçerik Eklemek İçin "Yeni Kurs Oluştur" Sayfasını Kullanın
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

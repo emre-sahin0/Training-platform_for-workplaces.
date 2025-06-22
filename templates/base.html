@@ -31,6 +31,19 @@
             </div>
         </div>
     </nav>
+    {% if request.endpoint in ['course', 'video'] %}
+        {% set current_course = course if course is defined else video.course if video is defined else None %}
+        {% if current_course %}
+            {% set user_progress = current_course.get_user_progress(current_user) %}
+            <div class="progress-container bg-light shadow-sm" style="position: sticky; top: 0; z-index: 1020; height: 2rem;">
+                <div class="progress-bar bg-success" role="progressbar" style="width: {{ user_progress.progress_percent }}%;" aria-valuenow="{{ user_progress.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                    <strong class="d-flex justify-content-center align-items-center h-100">
+                        %{{ user_progress.progress_percent|round|int }} Tamamlandı
+                    </strong>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
     <div class="d-flex" style="min-height:100vh;">
         <!-- Sidebar -->
         {% if current_user.is_authenticated and current_user.is_admin %}
@@ -64,6 +77,9 @@
             <a href="{{ url_for('admin_database') }}" class="sidebar-link">
                 <i class="bi bi-database-fill"></i>Database Yönetimi
             </a>
+            <a href="{{ url_for('admin_password_requests') }}" class="sidebar-link">
+                <i class="bi bi-key-fill"></i>Şifre Sıfırlama İstekleri
+            </a>
         </nav>
         {% elif current_user.is_authenticated %}
         <nav id="sidebarMenu">
@@ -92,8 +108,10 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20241227"></script>
+    {% block scripts %}{% endblock %}
     <script>
     // Improved Sidebar toggle
     document.addEventListener('DOMContentLoaded', function() {

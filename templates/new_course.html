@@ -42,42 +42,47 @@
                         <small class="form-text text-muted">Birden fazla kullanıcı seçebilirsiniz.</small>
                     </div>
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Video(lar) Ekle</label>
-                        <div id="videoInputs">
-                            <div class="row g-2 mb-2 video-input-row">
-                                <div class="col-md-5">
-                                    <input type="text" class="form-control" name="video_titles[]" placeholder="Video Başlığı" required>
-                                </div>
-                                <div class="col-md-5">
-                                    <input type="file" class="form-control" name="video_files[]" accept="video/*" required>
-                                </div>
-                                <div class="col-md-2 d-flex align-items-center">
-                                    <button type="button" class="btn btn-danger btn-sm remove-video-btn" onclick="removeVideoInput(this)">Sil</button>
-                                </div>
-                            </div>
+                        <label class="form-label fw-bold">Kurs İçeriği</label>
+                        <div id="content-inputs" class="mb-3">
+                            <!-- Dinamik içerik girişleri buraya eklenecek -->
                         </div>
-                        <button type="button" class="btn btn-info btn-sm mt-2" onclick="addVideoInput()">+ Video Ekle</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="addContentInput('video')"><i class="bi bi-camera-video"></i> + Video Ekle</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="addContentInput('pdf')"><i class="bi bi-file-earmark-pdf"></i> + PDF Ekle</button>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Test Ekle</label>
-                        <div class="mb-3">
-                            <label class="form-label">Test Dosyası (PDF veya Fotoğraf)</label>
-                            <input type="file" class="form-control" name="test_file" accept="application/pdf,image/*" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Soru Sayısı</label>
-                            <input type="number" class="form-control" name="pdf_question_count" min="1" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
-                            <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A" required>
+                    <hr class="my-4">
+
+                    <div class="form-check mb-3 p-3 rounded-3" style="background-color: #e9ecef;">
+                        <input class="form-check-input" type="checkbox" id="test_required" name="test_required" checked style="width: 1.2em; height: 1.2em;">
+                        <label class="form-check-label fw-bold ps-2" for="test_required" style="font-size: 1.1rem;">
+                            Bu kursu tamamlamak için test zorunlu mu?
+                        </label>
+                    </div>
+
+                    <div id="test_fields_wrapper" class="mt-4">
+                        <div class="p-3 border rounded-3">
+                            <h5 class="fw-bold mb-3">Test Detayları</h5>
+                            <div class="mb-3">
+                                <label class="form-label">Test Dosyası (PDF veya Fotoğraf)</label>
+                                <input type="file" class="form-control" name="test_file" accept="application/pdf,image/*">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Soru Sayısı</label>
+                                <input type="number" class="form-control" name="pdf_question_count" min="1">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
+                                <input type="text" class="form-control" name="pdf_answer_key" placeholder="A,B,C,D,A">
+                            </div>
+                            <div class="mb-3">
+                                <label for="passing_score" class="form-label">Geçme Notu</label>
+                                <input type="number" class="form-control" id="passing_score" name="passing_score" value="70">
+                            </div>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="passing_score" class="form-label">Geçme Notu</label>
-                        <input type="number" class="form-control" id="passing_score" name="passing_score" min="0" max="100" value="70" required>
-                    </div>
+                    
+                    <hr class="my-4">
+
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Kursu Oluştur</button>
                     </div>
@@ -140,145 +145,97 @@
     accent-color: #4f8cff;
     margin-right: 10px;
 }
+.drag-handle {
+    cursor: grab;
+    color: #a0aec0;
+}
+.drag-handle:hover {
+    color: #4f8cff;
+}
 </style>
 
 {% block scripts %}
 <script>
-function addVideoInput() {
-    const container = document.getElementById('videoInputs');
+let contentOrder = 0;
+
+function addContentInput(type) {
+    const container = document.getElementById('content-inputs');
     const row = document.createElement('div');
-    row.className = 'row g-2 mb-2 video-input-row';
+    row.className = 'row g-3 mb-3 p-3 border rounded-3 align-items-center content-input-row';
+    
+    const fileAccept = type === 'video' ? 'video/*' : 'application/pdf';
+    const placeholder = type === 'video' ? 'Video Başlığı' : 'PDF Başlığı';
+
     row.innerHTML = `
-        <div class="col-md-5">
-            <input type="text" class="form-control" name="video_titles[]" placeholder="Video Başlığı" required>
+        <input type="hidden" name="content_types[]" value="${type}">
+        <input type="hidden" name="content_orders[]" class="content-order-input" value="${contentOrder}">
+        <div class="col-md-1 text-center">
+            <i class="bi bi-grip-vertical drag-handle"></i>
         </div>
         <div class="col-md-5">
-            <input type="file" class="form-control" name="video_files[]" accept="video/*" required>
+            <input type="text" class="form-control" name="content_titles[]" placeholder="${placeholder}" required>
         </div>
-        <div class="col-md-2 d-flex align-items-center">
-            <button type="button" class="btn btn-danger btn-sm remove-video-btn" onclick="removeVideoInput(this)">Sil</button>
+        <div class="col-md-5">
+            <input type="file" class="form-control" name="content_files[]" accept="${fileAccept}" required>
+        </div>
+        <div class="col-md-1 text-end">
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.content-input-row').remove(); updateContentOrder();">Kaldır</button>
         </div>
     `;
     container.appendChild(row);
+    contentOrder++;
 }
 
-function removeVideoInput(btn) {
-    const container = document.getElementById('videoInputs');
-    if (container.querySelectorAll('.video-input-row').length > 1) {
-        btn.closest('.video-input-row').remove();
-    } else {
-        alert('En az bir video eklemelisiniz!');
-    }
+function updateContentOrder() {
+    const rows = document.querySelectorAll('#content-inputs .content-input-row');
+    rows.forEach((row, index) => {
+        row.querySelector('.content-order-input').value = index;
+    });
+    contentOrder = rows.length;
 }
 
-// Dinamik soru ekleme ve silme
-function updateQuestionIndexes() {
-    const questionCards = document.querySelectorAll('.question-card');
-    questionCards.forEach((card, idx) => {
-        // Radio name'lerini güncelle
-        const radios = card.querySelectorAll('input[type="radio"]');
-        radios.forEach(radio => {
-            radio.name = `correct_${idx}`;
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('content-inputs');
+    if(container) {
+        new Sortable(container, {
+            animation: 150,
+            handle: '.drag-handle',
+            onEnd: function() {
+                updateContentOrder();
+            }
         });
-    });
-}
-
-function removeQuestion(btn) {
-    const area = document.getElementById('questionsArea');
-    if (area.querySelectorAll('.question-card').length > 1) {
-        btn.closest('.question-card').remove();
-        updateQuestionIndexes();
-    } else {
-        alert('En az bir soru olmalı!');
     }
-}
 
-let questionIndex = 1;
-document.getElementById('addQuestionBtn').onclick = function() {
-    const area = document.getElementById('questionsArea');
-    let html = `<div class="card mb-3 question-card"><div class="card-body">
-        <div class="mb-2"><label class="form-label">Soru</label>
-        <input type="text" class="form-control" name="question_texts[]" required></div>
-        <div class="row">
-            <div class="col-6 mb-2">
-                <input type="text" class="form-control mb-1" name="option1[]" placeholder="A şıkkı" required>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="correct_${questionIndex}" value="0" required>
-                    <label class="form-check-label">Doğru Şık</label>
-                </div>
-            </div>
-            <div class="col-6 mb-2">
-                <input type="text" class="form-control mb-1" name="option2[]" placeholder="B şıkkı" required>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="correct_${questionIndex}" value="1">
-                    <label class="form-check-label">Doğru Şık</label>
-                </div>
-            </div>
-        </div>
-        <button type="button" class="btn btn-danger btn-sm mt-2" onclick="removeQuestion(this)">Soru Sil</button>
-    </div></div>`;
-    area.insertAdjacentHTML('beforeend', html);
-    questionIndex++;
-    updateQuestionIndexes();
-};
+    if (container.children.length === 0) {
+        addContentInput('video');
+    }
 
-// İlk sorunun radio butonlarında da sadece ilkine required ekle
-window.addEventListener('DOMContentLoaded', function() {
-    const firstCard = document.querySelector('.question-card .card-body');
-    if (firstCard && !firstCard.querySelector('.btn-danger')) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-danger btn-sm mt-2';
-        btn.textContent = 'Soru Sil';
-        btn.onclick = function() { removeQuestion(btn); };
-        firstCard.appendChild(btn);
-    }
-    // Radio required düzelt
-    const radios = firstCard.querySelectorAll('input[type="radio"]');
-    if (radios.length > 1) {
-        radios[0].setAttribute('required', 'required');
-        radios[1].removeAttribute('required');
-    }
-});
+    const testRequiredCheckbox = document.getElementById('test_required');
+    const testFieldsWrapper = document.getElementById('test_fields_wrapper');
+    if (testRequiredCheckbox && testFieldsWrapper) {
+        const testInputs = testFieldsWrapper.querySelectorAll('input, select');
 
-// Sekme değiştikçe required inputları yönet
-const classicInputs = document.querySelectorAll('#classicTest input');
-const pdfInputs = document.querySelectorAll('#pdfTest input');
-const classicTab = document.getElementById('classic-tab');
-const pdfTab = document.getElementById('pdf-tab');
-function setRequired(inputs, value) {
-    inputs.forEach(input => {
-        if (value) input.setAttribute('required', 'required');
-        else input.removeAttribute('required');
-    });
-}
-// Sayfa ilk açıldığında sadece aktif sekmedeki inputlar required olsun
-window.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('classicTest').classList.contains('show')) {
-        setRequired(classicInputs, true);
-        setRequired(pdfInputs, false);
-    } else {
-        setRequired(classicInputs, false);
-        setRequired(pdfInputs, true);
-    }
-});
-classicTab.addEventListener('click', function() {
-    setRequired(classicInputs, true);
-    setRequired(pdfInputs, false);
-});
-pdfTab.addEventListener('click', function() {
-    setRequired(classicInputs, false);
-    setRequired(pdfInputs, true);
-});
-// Form submit edilirken sadece aktif sekmedeki inputlar required olsun
-const form = document.querySelector('form');
-form.addEventListener('submit', function(e) {
-    if (document.getElementById('classicTest').classList.contains('show')) {
-        setRequired(classicInputs, true);
-        setRequired(pdfInputs, false);
-    } else {
-        setRequired(classicInputs, false);
-        setRequired(pdfInputs, true);
+        const toggleTestFields = () => {
+            const isChecked = testRequiredCheckbox.checked;
+            testFieldsWrapper.style.display = isChecked ? 'block' : 'none';
+            testInputs.forEach(input => {
+                if (isChecked) {
+                    if (input.name === 'test_file') {
+                        input.setAttribute('required', 'required');
+                    } else {
+                        input.removeAttribute('required');
+                    }
+                } else {
+                    input.removeAttribute('required');
+                    if (input.type !== 'checkbox' && input.type !== 'radio') {
+                       input.value = '';
+                    }
+                }
+            });
+        };
+
+        toggleTestFields();
+        testRequiredCheckbox.addEventListener('change', toggleTestFields);
     }
 });
 </script>

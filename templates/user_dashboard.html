@@ -40,25 +40,30 @@
                                     <h5 class="card-title">{{ course.title }}</h5>
                                     <p class="card-text">{{ course.description }}</p>
                                     {% set progress = course.get_user_progress(current_user) %}
-                                    <div class="progress mb-3">
-                                        {% set progress_percentage = (progress.completed / progress.total * 100)|round|int if progress.total and progress.total > 0 else 0 %}
-                                        <div class="progress-bar" role="progressbar" 
-                                            style="width: {{ progress_percentage }}%"
-                                            aria-valuenow="{{ progress_percentage }}"
+                                    <div class="progress mb-3" style="height: 25px;">
+                                        <div class="progress-bar fw-bold" role="progressbar" 
+                                            style="width: {{ progress.progress_percent }}%;"
+                                            aria-valuenow="{{ progress.progress_percent }}"
                                             aria-valuemin="0" 
                                             aria-valuemax="100">
-                                            {{ progress_percentage }}%
+                                            %{{ progress.progress_percent|round|int }}
                                         </div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="text-muted">
-                                            {{ progress.completed }}/{{ progress.total }} tamamlandı
+                                        <span class="text-muted fw-bold">
+                                            {% if progress.is_completed %}
+                                                <i class="bi bi-check-circle-fill text-success"></i> Tamamlandı
+                                            {% else %}
+                                                {{ progress.completed_steps }}/{{ progress.total_steps }} Adım Tamamlandı
+                                            {% endif %}
                                         </span>
                                         <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-primary">
-                                            {% if progress.completed == 0 %}
-                                                Kursa Başla
-                                            {% else %}
+                                            {% if progress.is_completed %}
+                                                Tekrar Gözat
+                                            {% elif progress.completed_steps > 0 %}
                                                 Kursa Devam Et
+                                            {% else %}
+                                                Kursa Başla
                                             {% endif %}
                                         </a>
                                     </div>

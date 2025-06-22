@@ -1,234 +1,51 @@
 {% extends "base.html" %}
 
+{% block title %}{{ course.title }}{% endblock %}
+
 {% block content %}
-<div class="row mb-4">
-    <div class="col">
-        <h2>{{ course.title }}</h2>
-        <p class="text-muted">{{ course.description }}</p>
-    </div>
-    {% if current_user.is_admin %}
-    <div class="col-auto d-flex gap-2">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadVideoModal">
-            Video Yükle
-        </button>
-        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#editCourseModal">
-            Kursu Düzenle
-        </button>
-        <form action="{{ url_for('delete_course', course_id=course.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Bu kursu silmek istediğinize emin misiniz? Tüm videolar da silinecek!');">
-            <button type="submit" class="btn btn-danger">Kursu Sil</button>
-        </form>
-        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#testModal">
-            {% if course.tests|length > 0 %}Testi Düzenle{% else %}Test Ekle{% endif %}
-        </button>
-    </div>
-    {% endif %}
-</div>
-
-<div class="list-group">
-    {% for video in videos %}
-    <div class="list-group-item">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h5 class="mb-1">{{ video.title }}</h5>
-                {% if not current_user.is_admin %}
-                    {% set progress = current_user.progress|selectattr('video_id', 'equalto', video.id)|first %}
-                    {% if progress and progress.completed %}
-                        <span class="badge bg-success">Tamamlandı</span>
-                    {% else %}
-                        <span class="badge bg-warning">Devam Ediyor</span>
-                    {% endif %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2 text-center">
+            <div class="course-landing-card p-5">
+                <h1 class="display-4">{{ course.title }}</h1>
+                <p class="lead mt-3">{{ course.description }}</p>
+                <hr class="my-4">
+                
+                {% if status == 'completed' %}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-lg">
+                        <i class="fas fa-home"></i> Ana Sayfaya Git
+                    </a>
+                {% else %}
+                    <a href="{{ start_url }}" class="btn btn-primary btn-lg start-education-btn">
+                        <i class="fas fa-play-circle"></i> {{ button_text }}
+                    </a>
                 {% endif %}
-            </div>
-            <a href="{{ url_for('video', video_id=video.id) }}" class="btn btn-primary">İzle</a>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
-{% if current_user.is_admin %}
-<!-- Video Yükleme Modal -->
-<div class="modal fade" id="uploadVideoModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Video Yükle</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form action="{{ url_for('upload_video', course_id=course.id) }}" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="title" class="form-label">Video Başlığı</label>
-                        <input type="text" class="form-control" id="title" name="title" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="video" class="form-label">Video Dosyası</label>
-                        <input type="file" class="form-control" id="video" name="video" accept="video/*" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Yükle</button>
-                </form>
+                
             </div>
         </div>
     </div>
 </div>
 
-<!-- Kurs Düzenleme Modal -->
-<div class="modal fade" id="editCourseModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Kursu Düzenle</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form action="{{ url_for('edit_course', course_id=course.id) }}" method="POST">
-                    <div class="mb-3">
-                        <label for="edit_title" class="form-label">Kurs Başlığı</label>
-                        <input type="text" class="form-control" id="edit_title" name="title" value="{{ course.title }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_description" class="form-label">Kurs Açıklaması</label>
-                        <textarea class="form-control" id="edit_description" name="description" required>{{ course.description }}</textarea>
-                    </div>
-                    <button type="submit" class="btn btn-warning">Kaydet</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Test Ekle/Düzenle Modal -->
-<div class="modal fade" id="testModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Test {% if course.tests|length > 0 %}Düzenle{% else %}Ekle{% endif %}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form action="{{ url_for('edit_test', course_id=course.id) }}" method="POST">
-                    <div class="mb-3">
-                        <label for="test_title" class="form-label">Test Başlığı</label>
-                        <input type="text" class="form-control" id="test_title" name="title" value="{{ course.tests[0].title if course.tests|length > 0 else '' }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="passing_score" class="form-label">Geçme Barajı (puan)</label>
-                        <input type="number" class="form-control" id="passing_score" name="passing_score" value="{{ course.tests[0].passing_score if course.tests|length > 0 else 0 }}" min="1" required>
-                    </div>
-                    <div id="questionsArea">
-                        {% if course.tests|length > 0 %}
-                            {% for question in course.tests[0].questions %}
-                                {% set q_idx = loop.index0 %}
-                                <div class="card mb-3">
-                                    <div class="card-body">
-                                        <div class="mb-2">
-                                            <label class="form-label">Soru</label>
-                                            <input type="text" class="form-control" name="question_{{ q_idx }}" value="{{ question.text }}" required>
-                                        </div>
-                                        <div class="row">
-                                            {% for option in question.options %}
-                                            <div class="col-6 mb-2">
-                                                <input type="text" class="form-control mb-1" name="option_{{ q_idx }}_{{ loop.index0 }}" value="{{ option.text }}" required>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="correct_{{ q_idx }}" value="{{ loop.index0 }}" {% if option.is_correct %}checked{% endif %}>
-                                                    <label class="form-check-label">Doğru Şık</label>
-                                                </div>
-                                            </div>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                    <button type="button" class="btn btn-outline-primary mb-3" id="addQuestionBtn">+ Soru Ekle</button>
-                    <button type="submit" class="btn btn-success">Kaydet</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Test PDF Yükleme ve Cevap Anahtarı Formu -->
-<div class="card mb-4">
-    <div class="card-header bg-info text-dark fw-bold">Test PDF Yükle & Cevap Anahtarı</div>
-    <div class="card-body">
-        <form action="{{ url_for('upload_test_pdf', course_id=course.id) }}" method="POST" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="test_pdf" class="form-label">Test PDF Dosyası</label>
-                <input type="file" class="form-control" id="test_pdf" name="test_pdf" accept="application/pdf" required>
-            </div>
-            <div class="mb-3">
-                <label for="question_count" class="form-label">Soru Sayısı</label>
-                <input type="number" class="form-control" id="question_count" name="question_count" min="1" required>
-            </div>
-            <div class="mb-3">
-                <label for="answer_key" class="form-label">Cevap Anahtarı (örn: A,B,C,D,A...)</label>
-                <input type="text" class="form-control" id="answer_key" name="answer_key" placeholder="A,B,C,D,A" required>
-            </div>
-            <button type="submit" class="btn btn-success">Kaydet</button>
-        </form>
-    </div>
-</div>
-{% endif %}
-
-{% if not current_user.is_admin and (course.test_pdf or course.test_images) and course.test_question_count and course.test_answer_key %}
-    {% set last_video = course.videos|sort(attribute='order')|last %}
-    {% set progress = (current_user.progress|selectattr('video_id', 'equalto', last_video.id)|first) if last_video else None %}
-    {% set completed_count = course.videos|selectattr('id', 'in', current_user.progress|selectattr('completed', 'equalto', True)|map(attribute='video_id')|list)|list|length %}
-    {% set total_count = course.videos|length %}
-    {% if completed_count == total_count and total_count > 0 %}
-        {% if not progress or not progress.test_completed %}
-            <div class="mt-4">
-                <a href="{{ url_for('pdf_test', course_id=course.id) }}" class="btn btn-success">
-                    Teste Gir
-                </a>
-            </div>
-        {% else %}
-            <div class="alert alert-success mt-4">
-                Testi tamamladınız. Tekrar giremezsiniz.
-            </div>
-        {% endif %}
-    {% else %}
-        <div class="alert alert-warning mt-4">
-            Teste girebilmek için önce tüm videoları tamamlamalısınız.
-        </div>
-    {% endif %}
-{% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    let questionCount = Number("{{ course.tests[0].questions|length if course.tests|length > 0 else 0 }}");
-    var addBtn = document.getElementById('addQuestionBtn');
-    if (addBtn) {
-        addBtn.addEventListener('click', function() {
-            const area = document.getElementById('questionsArea');
-            const qIndex = questionCount;
-            let html = `<div class="card mb-3"><div class="card-body">
-                <div class="mb-2"><label class="form-label">Soru</label>
-                <input type="text" class="form-control" name="question_${qIndex}" required></div>
-                <div class="row">
-                    <div class="col-6 mb-2">
-                        <input type="text" class="form-control mb-1" name="option_${qIndex}_0" required>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="correct_${qIndex}" value="0">
-                            <label class="form-check-label">Doğru Şık</label>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-2">
-                        <input type="text" class="form-control mb-1" name="option_${qIndex}_1" required>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="correct_${qIndex}" value="1">
-                            <label class="form-check-label">Doğru Şık</label>
-                        </div>
-                    </div>
-                </div>
-            </div></div>`;
-            area.insertAdjacentHTML('beforeend', html);
-            questionCount++;
-        });
+<style>
+    .course-landing-card {
+        background-color: #ffffff;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
     }
-});
-</script>
+    .course-landing-card:hover {
+        transform: translateY(-5px);
+    }
+    .start-education-btn {
+        padding: 15px 40px;
+        font-size: 1.25rem;
+        border-radius: 50px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+    .start-education-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+    }
+</style>
 {% endblock %} 

@@ -25,10 +25,15 @@
                         {% endfor %}
                     </ul>
                 </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('view_certificate', certificate_id=certificate.id) }}" class="btn btn-primary">Belgeyi Görüntüle</a>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('download_certificate_pdf', certificate_id=certificate.id) }}" class="btn btn-primary">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF İndir
+                    </a>
+                    
                     {% if certificate.certificate_file %}
-                        <a href="{{ url_for('static', filename='uploads/' ~ certificate.certificate_file) }}" class="btn btn-success" target="_blank">Sertifika Dosyasını İndir/Görüntüle</a>
+                        <a href="{{ url_for('static', filename='uploads/' + certificate.certificate_file) }}" class="btn btn-info" target="_blank">
+                            <i class="bi bi-file-earmark-arrow-down"></i> Yükleneni İndir
+                        </a>
                     {% endif %}
                 </div>
             </div>

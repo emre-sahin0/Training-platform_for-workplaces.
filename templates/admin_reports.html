@@ -44,8 +44,8 @@
                         <tr>
                             <th>Kullanıcı Adı</th>
                             <th>E-posta</th>
-                            <th>Tamamlanan Video</th>
-                            <th>Toplam Video</th>
+                            <th>Tamamlanan İçerik</th>
+                            <th>Toplam İçerik</th>
                             <th>İlerleme (%)</th>
                             <th>Test Sonucu</th>
                             <th>Durum</th>
@@ -53,27 +53,23 @@
                     </thead>
                     <tbody>
                         {% for user in course.assigned_users %}
-                        {% set completed_videos = 0 %}
+                        {% set progress_details = course.get_user_progress(user) %}
                         {% set test_score = '-' %}
                         {% set test_status = 'Devam Ediyor' %}
-                        {% set last_completed_at = '' %}
-                        {% for video in course.videos %}
-                            {% set progress = (user.progress|selectattr('video_id', 'equalto', video.id)|first) %}
-                            {% if progress and progress.completed %}
-                                {% set completed_videos = completed_videos + 1 %}
-                                {% if progress.completed_at %}{% set last_completed_at = progress.completed_at.strftime('%d.%m.%Y %H:%M') %}{% endif %}
-                                {% if progress.test_score is not none %}{% set test_score = progress.test_score %}{% endif %}
-                                {% if progress.test_completed %}{% set test_status = 'Tamamlandı' %}{% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        {% set total_videos = course.videos|length %}
-                        {% set percent = (completed_videos / total_videos * 100)|round|int if total_videos > 0 else 0 %}
+                        
+                        {% if progress_details.passed_test %}
+                            {% set test_score = progress_details.test_score if progress_details.test_score is not none else '-' %}
+                            {% set test_status = 'Tamamlandı' %}
+                        {% elif progress_details.is_completed %}
+                            {% set test_status = 'Tamamlandı' %}
+                        {% endif %}
+                        
                         <tr>
                             <td>{{ user.first_name }} {{ user.last_name }}</td>
                             <td>{{ user.email }}</td>
-                            <td>{{ completed_videos }}</td>
-                            <td>{{ total_videos }}</td>
-                            <td>{{ percent }}%</td>
+                            <td>{{ progress_details.completed_steps }}</td>
+                            <td>{{ progress_details.total_steps }}</td>
+                            <td>{{ progress_details.progress_percent }}%</td>
                             <td>{{ test_score }}</td>
                             <td>{{ test_status }}</td>
                         </tr>

@@ -1,11 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import openpyxl
 from config import Config
-from models import db, login_manager, User, Course, Video, Test, Question, Option, Progress, Announcement, Category, CertificateType, Certificate
+from models import db, login_manager, User, Course, Video, Test, Question, Option, Progress, Announcement, Category, CertificateType, Certificate, PasswordReset, Pdf, PdfProgress
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import uuid
 from flask_talisman import Talisman
@@ -13,7 +13,12 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField
-from wtforms.validators import DataRequired, Length, Regexp
+from wtforms.validators import DataRequired, Length, Regexp, EqualTo
+import secrets
+from flask_migrate import Migrate
+from flask_mail import Mail, Message
+from flask_weasyprint import render_pdf
+from flask_weasyprint import HTML
 
 # Limiter nesnesini yeni sürüme uygun şekilde başlat
 limiter = Limiter(
@@ -42,8 +47,45 @@ def create_app():
     return app
 
 app = create_app()
+mail = Mail(app)
+migrate = Migrate(app, db)
 
-# --- Giriş Formu (güçlü parola kontrolü için) ---
+# --- Güçlü şifre politikası için yardımcı fonksiyon ---
+def password_policy_check(password):
+    if len(password) < 8:
+        return False, "Şifre en az 8 karakter olmalı."
+    if not any(c.isupper() for c in password):
+        return False, "Şifre en az bir büyük harf içermeli."
+    if not any(c.islower() for c in password):
+        return False, "Şifre en az bir küçük harf içermeli."
+    if not any(c.isdigit() for c in password):
+        return False, "Şifre en az bir rakam içermeli."
+    if not any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+        return False, "Şifre en az bir özel karakter içermeli (!@#$%^&* vb.)."
+    return True, ""
+
+def send_password_reset_email(user, token):
+    """Kullanıcıya şifre sıfırlama e-postası gönderir."""
+    msg = Message(
+        'AdaWall Eğitim - Şifre Sıfırlama İsteği',
+        sender=app.config['MAIL_DEFAULT_SENDER'],
+        recipients=[user.email]
+    )
+    reset_url = url_for('reset_password_with_token', token=token, _external=True)
+    msg.html = render_template('email/reset_password.html', user=user, reset_url=reset_url)
+    try:
+        mail.send(msg)
+        return True
+    except Exception as e:
+        app.logger.error(f"E-posta gönderme hatası: {e}")
+        return False
+
+# --- Form Sınıfları ---
+
+class EmptyForm(FlaskForm):
+    """CSRF koruması için boş form."""
+    pass
+
 class LoginForm(FlaskForm):
     username = StringField('Kullanıcı Adı', validators=[DataRequired()])
     password = PasswordField('Şifre', validators=[DataRequired()])
@@ -57,6 +99,13 @@ password_policy = [
     Regexp(r'.*[^A-Za-z0-9].*', message='Şifre en az bir özel karakter içermeli.')
 ]
 
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('Yeni Şifre', validators=[DataRequired()] + password_policy)
+    confirm = PasswordField('Yeni Şifreyi Onayla', validators=[
+        DataRequired(),
+        EqualTo('password', message='Şifreler eşleşmelidir.')
+    ])
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -64,6 +113,8 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -123,45 +174,342 @@ def dashboard():
 @app.route('/course/<int:course_id>')
 @login_required
 def course(course_id):
+    # Admin ise kurs yönetim sayfasına yönlendir
+    if current_user.is_admin:
+        return redirect(url_for('admin_manage_course', course_id=course_id))
+    
     course = Course.query.get_or_404(course_id)
-    videos = Video.query.filter_by(course_id=course_id).order_by(Video.order).all()
-    return render_template('course.html', course=course, videos=videos)
+    content = get_course_content(course.id)
+
+    # Eğer kursta hiç içerik yoksa
+    if not content:
+        return render_template('course.html', course=course, status='empty', button_text='Kursta İçerik Yok', start_url=url_for('dashboard'))
+
+    # Kullanıcının ilerlemesini al
+    progress_details = course.get_user_progress(current_user)
+    
+    # Kullanıcının tamamladığı videoları bul
+    completed_video_ids = set()
+    for progress in current_user.progress:
+        if progress.completed and progress.video:
+            if progress.video.course_id == course_id:
+                completed_video_ids.add(progress.video_id)
+
+    # Görüntülenen PDF'leri al (database'den)
+    viewed_pdf_ids = set()
+    pdf_progress_list = PdfProgress.query.filter_by(user_id=current_user.id).all()
+    for pdf_progress in pdf_progress_list:
+        if pdf_progress.pdf.course_id == course_id:
+            viewed_pdf_ids.add(pdf_progress.pdf_id)
+
+    # Sıradaki içeriği bul
+    next_item = None
+    for item in content:
+        if item['type'] == 'video':
+            # Video tamamlanmamışsa, bu sıradaki adım
+            if item['id'] not in completed_video_ids:
+                next_item = item
+                break
+        elif item['type'] == 'pdf':
+            # PDF görüntülenmemişse, bu sıradaki adım
+            if item['id'] not in viewed_pdf_ids:
+                next_item = item
+                break
+
+    # URL ve durumu belirle
+    start_url = url_for('dashboard') 
+    status = 'not_started'
+    button_text = 'Eğitime Başla'
+    
+    # Hiç başlanmamış mı?
+    has_any_progress = bool(completed_video_ids or viewed_pdf_ids)
+    
+    if next_item:
+        # Sonraki adım var
+        if next_item['type'] == 'video':
+            start_url = url_for('video', video_id=next_item['id'])
+        else: # pdf
+            start_url = url_for('pdf_viewer', pdf_id=next_item['id'])
+        
+        # Başlanmış mı?
+        if has_any_progress:
+            status = 'in_progress'
+            button_text = 'Eğitime Devam Et'
+        else:
+            status = 'not_started'
+            button_text = 'Eğitime Başla'
+    else:
+        # Sonraki adım yok - tüm içerik tamamlandı mı kontrol et
+        if progress_details.all_content_completed:
+            status = 'completed'
+            if course.test_required and (course.test_pdf or course.test_images):
+                # Test tamamlanmış mı kontrol et
+                if not progress_details.passed_test:
+                    start_url = url_for('pdf_test', course_id=course.id)
+                    button_text = 'Kursu Bitirme Testine Git'
+                    status = 'test_required'
+                else:
+                    button_text = 'Kurs Tamamlandı'
+                    start_url = url_for('dashboard')
+                    status = 'completed'
+            else:
+                button_text = 'Kurs Tamamlandı'
+                start_url = url_for('dashboard')
+                status = 'completed'
+        else:
+            # İçerik tamamlanmamış ama sonraki adım bulunamadı - bu bir hata durumu
+            # En son erişilebilir içeriğe yönlendir
+            if has_any_progress:
+                # Son tamamlanan içeriği bul
+                last_accessible_item = None
+                for item in content:
+                    if item['type'] == 'video' and item['id'] in completed_video_ids:
+                        last_accessible_item = item
+                    elif item['type'] == 'pdf' and item['id'] in viewed_pdf_ids:
+                        last_accessible_item = item
+                
+                if last_accessible_item:
+                    if last_accessible_item['type'] == 'video':
+                        start_url = url_for('video', video_id=last_accessible_item['id'])
+                    else:
+                        start_url = url_for('pdf_viewer', pdf_id=last_accessible_item['id'])
+                    status = 'in_progress'
+                    button_text = 'Eğitime Devam Et'
+                else:
+                    # İlk içeriğe yönlendir
+                    first_item = content[0]
+                    if first_item['type'] == 'video':
+                        start_url = url_for('video', video_id=first_item['id'])
+                    else:
+                        start_url = url_for('pdf_viewer', pdf_id=first_item['id'])
+                    status = 'in_progress'
+                    button_text = 'Eğitime Devam Et'
+            else:
+                # Hiç başlanmamış, ilk içeriğe yönlendir
+                first_item = content[0]
+                if first_item['type'] == 'video':
+                    start_url = url_for('video', video_id=first_item['id'])
+                else:
+                    start_url = url_for('pdf_viewer', pdf_id=first_item['id'])
+                status = 'not_started'
+                button_text = 'Eğitime Başla'
+
+    return render_template('course.html', course=course, start_url=start_url, status=status, button_text=button_text)
+
+def get_course_content(course_id):
+    course = Course.query.get_or_404(course_id)
+    videos = [{'type': 'video', 'id': v.id, 'data': v} for v in course.videos]
+    pdfs = [{'type': 'pdf', 'id': p.id, 'data': p} for p in course.pdfs]
+    return sorted(videos + pdfs, key=lambda x: x['data'].order)
 
 @app.route('/video/<int:video_id>')
 @login_required
 def video(video_id):
     video = Video.query.get_or_404(video_id)
-    progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
-    is_last_video = False
-    test_completed = None
     course = video.course
-    videos = sorted(course.videos, key=lambda v: v.order)
-    # Video aşamaları
-    total_videos = len(videos)
-    completed_videos = 0
-    for v in videos:
-        p = Progress.query.filter_by(user_id=current_user.id, video_id=v.id).first()
-        if p and p.completed:
-            completed_videos += 1
-    # Test aşaması
-    has_test = bool((course.test_pdf and course.test_question_count and course.test_answer_key) or (course.tests and course.tests[0].questions))
-    test_is_completed = False
-    if has_test:
-        # Son video üzerinden test tamamlanma kontrolü
-        last_video = videos[-1] if videos else None
-        if last_video:
-            last_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
-            if last_progress and last_progress.test_completed:
-                test_is_completed = True
-    # Toplam aşama ve tamamlanan aşama
-    total_steps = total_videos + (1 if has_test else 0)
-    completed_steps = completed_videos + (1 if test_is_completed else 0)
-    progress_percent = int((completed_steps / total_steps) * 100) if total_steps > 0 else 0
-    # Son video ve test durumu
-    if videos and video.id == videos[-1].id:
-        is_last_video = True
-        test_completed = test_is_completed
-    return render_template('video.html', video=video, progress=progress, is_last_video=is_last_video, test_completed=test_completed, total_videos=total_videos, completed_videos=completed_videos, progress_percent=progress_percent, total_steps=total_steps, completed_steps=completed_steps, has_test=has_test, test_pdf=course.test_pdf, test_image=course.test_images)
+    
+    content_list = get_course_content(course.id)
+    current_index = -1
+    for i, item in enumerate(content_list):
+        if item['type'] == 'video' and item['id'] == video_id:
+            current_index = i
+            break
+    
+    # Kullanıcının tamamladığı videoları bul
+    completed_video_ids = set()
+    for progress in current_user.progress:
+        if progress.completed and progress.video:
+            if progress.video.course_id == course.id:
+                completed_video_ids.add(progress.video_id)
+    
+    # Görüntülenen PDF'leri al (database'den)
+    viewed_pdf_ids = set()
+    pdf_progress_list = PdfProgress.query.filter_by(user_id=current_user.id).all()
+    for pdf_progress in pdf_progress_list:
+        if pdf_progress.pdf.course_id == course.id:
+            viewed_pdf_ids.add(pdf_progress.pdf_id)
+    
+    # Önceki ve sonraki URL'leri belirle
+    prev_url = None
+    next_url = None
+    can_access_next = False
+    
+    # Önceki içerik (her zaman erişilebilir)
+    if current_index > 0:
+        prev_item = content_list[current_index - 1]
+        if prev_item['type'] == 'video':
+            prev_url = url_for('video', video_id=prev_item['id'])
+        else:
+            prev_url = url_for('pdf_viewer', pdf_id=prev_item['id'])
+    
+    # Sonraki içerik belirleme
+    current_video_completed = video_id in completed_video_ids
+    
+    if current_index < len(content_list) - 1:
+        # Henüz son içerik değil, sonraki video/PDF var
+        if current_video_completed:
+            next_item = content_list[current_index + 1]
+            can_access_next = True
+            if next_item['type'] == 'video':
+                next_url = url_for('video', video_id=next_item['id'])
+            else:
+                next_url = url_for('pdf_viewer', pdf_id=next_item['id'])
+    else:
+        # Bu son içerik, test kontrolü yap
+        if current_video_completed:
+            # Bu video tamamlandıysa, test var mı kontrol et
+            if course.test_required and (course.test_pdf or course.test_images):
+                # Test tamamlanmış mı kontrol et
+                existing_progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
+                if not existing_progress or not existing_progress.test_completed:
+                    next_url = url_for('pdf_test', course_id=course.id)
+                    can_access_next = True
+
+    progress_details = course.get_user_progress(current_user)
+    video_progress = video.get_progress(current_user)
+
+    return render_template(
+        'video.html',
+        video=video,
+        course=course,
+        progress=video_progress,
+        completed_steps=progress_details.completed_steps,
+        total_steps=progress_details.total_steps,
+        progress_percent=progress_details.progress_percent,
+        prev_url=prev_url,
+        next_url=next_url,
+        can_access_next=can_access_next
+    )
+
+@app.route('/pdf/<int:pdf_id>')
+@login_required
+def pdf_viewer(pdf_id):
+    pdf = Pdf.query.get_or_404(pdf_id)
+    course = pdf.course
+
+    # PDF görüntüleme kaydını oluştur/güncelle (database'de)
+    existing_progress = PdfProgress.query.filter_by(user_id=current_user.id, pdf_id=pdf_id).first()
+    if not existing_progress:
+        pdf_progress = PdfProgress(user_id=current_user.id, pdf_id=pdf_id)
+        db.session.add(pdf_progress)
+        db.session.commit()
+
+    content_list = get_course_content(course.id)
+    current_index = -1
+    for i, item in enumerate(content_list):
+        if item['type'] == 'pdf' and item['id'] == pdf_id:
+            current_index = i
+            break
+    
+    # Navigasyon URL'leri
+    prev_url = None
+    next_url = None
+    
+    # Önceki içerik
+    if current_index > 0:
+        prev_item = content_list[current_index - 1]
+        if prev_item['type'] == 'video':
+            prev_url = url_for('video', video_id=prev_item['id'])
+        else:
+            prev_url = url_for('pdf_viewer', pdf_id=prev_item['id'])
+    
+    # Sonraki içerik belirleme
+    if current_index < len(content_list) - 1:
+        # Henüz son içerik değil, sonraki video/PDF var
+        next_item = content_list[current_index + 1]
+        if next_item['type'] == 'video':
+            next_url = url_for('video', video_id=next_item['id'])
+        else:
+            next_url = url_for('pdf_viewer', pdf_id=next_item['id'])
+    else:
+        # Bu son içerik, test kontrolü yap
+        progress_details = course.get_user_progress(current_user)
+        if course.test_required and progress_details.all_content_completed:
+            if (course.test_pdf or course.test_images):
+                # Test tamamlanmış mı kontrol et
+                course_videos = sorted(course.videos, key=lambda v: v.order)
+                last_video = course_videos[-1] if course_videos else None
+                test_progress = None
+                if last_video:
+                    test_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
+                
+                if not test_progress or not test_progress.test_completed:
+                    next_url = url_for('pdf_test', course_id=course.id)
+
+    # Progress bilgilerini al
+    progress_details = course.get_user_progress(current_user)
+
+    return render_template('pdf_viewer.html', 
+                         pdf=pdf, 
+                         course=course, 
+                         prev_url=prev_url, 
+                         next_url=next_url,
+                         completed_steps=progress_details.completed_steps,
+                         total_steps=progress_details.total_steps,
+                         progress_percent=progress_details.progress_percent)
+
+@app.route('/video/<int:video_id>/complete', methods=['POST'])
+@login_required
+def complete_video_and_get_next(video_id):
+    """Videoyu tamamlandı olarak işaretler ve bir sonraki adımın URL'sini döndürür."""
+    video = Video.query.get_or_404(video_id)
+    progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
+    if not progress:
+        progress = Progress(user_id=current_user.id, video_id=video_id)
+        db.session.add(progress)
+    progress.completed = True
+    progress.completed_at = datetime.utcnow()
+    db.session.commit()
+
+    course = video.course
+    content_list = get_course_content(course.id)
+    
+    # Mevcut video'nun content listesindeki pozisyonunu bul
+    current_index = -1
+    for i, item in enumerate(content_list):
+        if item['type'] == 'video' and item['id'] == video_id:
+            current_index = i
+            break
+    
+    next_url = None
+    message = "Video tamamlandı!"
+
+    # Sonraki içerik var mı?
+    if current_index != -1 and current_index < len(content_list) - 1:
+        next_item = content_list[current_index + 1]
+        if next_item['type'] == 'video':
+            next_url = url_for('video', video_id=next_item['id'])
+            message = "Sonraki videoya geçebilirsiniz."
+        else:  # PDF
+            next_url = url_for('pdf_viewer', pdf_id=next_item['id'])
+            message = "Sonraki PDF materyaline geçebilirsiniz."
+    else:
+        # Tüm içerik tamamlandı, test var mı kontrol et
+        user_progress_details = course.get_user_progress(current_user)
+        if course.test_required and user_progress_details.all_content_completed:
+            if (course.test_pdf or course.test_images):
+                # Test henüz tamamlanmamışsa teste yönlendir
+                course_videos = sorted(course.videos, key=lambda v: v.order)
+                last_video = course_videos[-1] if course_videos else None
+                test_progress = None
+                if last_video:
+                    test_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
+                
+                if not test_progress or not test_progress.test_completed:
+                    next_url = url_for('pdf_test', course_id=course.id)
+                    message = "Tüm içerik tamamlandı! Teste geçebilirsiniz."
+                else:
+                    message = "Tebrikler, kursu tamamladınız!"
+            else:
+                message = "Tebrikler, kursu tamamladınız!"
+        else:
+            message = "Tebrikler, kursu tamamladınız!"
+            
+    return jsonify({
+        'success': True, 
+        'next_url': next_url,
+        'message': message
+    })
 
 @app.route('/test/<int:test_id>', methods=['GET', 'POST'])
 @login_required
@@ -185,63 +533,98 @@ def test(test_id):
     
     return render_template('test.html', test=test)
 
-@app.route('/admin/course/new', methods=['GET', 'POST'])
+@app.route('/admin/new-course', methods=['GET', 'POST'])
 @login_required
 def new_course():
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        # Temel kurs bilgilerini al
+        title = request.form.get('title')
+        description = request.form.get('description')
+        category_id = request.form.get('category_id')
+        assigned_user_ids = request.form.getlist('assigned_users')
+        passing_score = request.form.get('passing_score', 70, type=int)
+        test_required = 'test_required' in request.form
+
+        # Yeni kursu oluştur ve session'a ekle
+        new_course = Course(
+            title=title, 
+            description=description, 
+            category_id=category_id,
+            passing_score=passing_score,
+            test_required=test_required,
+            certificate_type_id=None # Şimdilik boş, gerekirse güncellenebilir
+        )
+        db.session.add(new_course)
+        
+        # Kullanıcıları ata
+        new_course.assigned_users = User.query.filter(User.id.in_(assigned_user_ids)).all()
+
+        # Commit edip ID'yi al
+        db.session.commit()
+
+        # Kurs içeriğini işle
+        content_titles = request.form.getlist('content_titles[]')
+        content_types = request.form.getlist('content_types[]')
+        content_orders = request.form.getlist('content_orders[]')
+        content_files = request.files.getlist('content_files[]')
+
+        for i, file in enumerate(content_files):
+            if file and file.filename:
+                content_type = content_types[i]
+                timestamp = datetime.utcnow().timestamp()
+                
+                if content_type == 'video':
+                    filename = secure_filename(f"video_{new_course.id}_{timestamp}_{file.filename}")
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    item = Video(
+                        title=content_titles[i],
+                        video_path=filename,
+                        course_id=new_course.id,
+                        order=int(content_orders[i])
+                    )
+                    db.session.add(item)
+                elif content_type == 'pdf':
+                    filename = secure_filename(f"pdf_{new_course.id}_{timestamp}_{file.filename}")
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    item = Pdf(
+                        title=content_titles[i],
+                        pdf_path=filename,
+                        course_id=new_course.id,
+                        order=int(content_orders[i])
+                    )
+                    db.session.add(item)
+        
+        # Test dosyası (PDF veya resim) - Sadece test zorunlu ise işle
+        if new_course.test_required:
+            test_file = request.files.get('test_file')
+            pdf_question_count = request.form.get('pdf_question_count')
+            pdf_answer_key = request.form.get('pdf_answer_key')
+
+            if test_file and test_file.filename and pdf_question_count and pdf_answer_key:
+                ext = os.path.splitext(test_file.filename)[1].lower()
+                if ext == '.pdf':
+                    filename = secure_filename(f"test_{new_course.id}_{test_file.filename}")
+                    new_course.test_pdf = filename
+                    new_course.test_images = None
+                elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
+                    filename = secure_filename(f"testimg_{new_course.id}_{datetime.utcnow().timestamp()}_{test_file.filename}")
+                    new_course.test_images = filename
+                    new_course.test_pdf = None
+                
+                test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                new_course.test_question_count = int(pdf_question_count)
+                new_course.test_answer_key = pdf_answer_key
+        
+        db.session.commit()
+        flash('Kurs başarıyla oluşturuldu!', 'success')
+        return redirect(url_for('dashboard'))
+
+    # GET request için
     users = User.query.filter_by(is_admin=False).all()
     categories = Category.query.all()
-    if request.method == 'POST':
-        course = Course(
-            title=request.form.get('title'),
-            description=request.form.get('description'),
-            category_id=request.form.get('category_id'),
-            passing_score=request.form.get('passing_score', type=int)
-        )
-        # Kullanıcı atama
-        assigned_user_ids = request.form.getlist('assigned_users')
-        course.assigned_users = User.query.filter(User.id.in_(assigned_user_ids)).all()
-        db.session.add(course)
-        db.session.commit()
-
-        # Video(lar) ekle
-        video_titles = request.form.getlist('video_titles[]')
-        video_files = request.files.getlist('video_files[]')
-        for idx, (title, file) in enumerate(zip(video_titles, video_files)):
-            if file and file.filename:
-                filename = secure_filename(f"{datetime.utcnow().timestamp()}_{file.filename}")
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                video = Video(
-                    title=title,
-                    video_path=filename,
-                    course_id=course.id,
-                    order=idx+1
-                )
-                db.session.add(video)
-        db.session.commit()
-
-        # Test dosyası (PDF veya resim)
-        test_file = request.files.get('test_file')
-        pdf_question_count = request.form.get('pdf_question_count')
-        pdf_answer_key = request.form.get('pdf_answer_key')
-        if test_file and test_file.filename:
-            ext = os.path.splitext(test_file.filename)[1].lower()
-            if ext == '.pdf':
-                filename = secure_filename(f"test_{course.id}_{test_file.filename}")
-                test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                course.test_pdf = filename
-                course.test_images = None
-            elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
-                img_filename = secure_filename(f"testimg_{course.id}_{datetime.utcnow().timestamp()}_{test_file.filename}")
-                test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], img_filename))
-                course.test_images = img_filename
-                course.test_pdf = None
-            course.test_question_count = int(pdf_question_count) if pdf_question_count else None
-            course.test_answer_key = pdf_answer_key
-            db.session.commit()
-
-        return redirect(url_for('dashboard'))
     return render_template('new_course.html', users=users, categories=categories)
 
 @app.route('/admin/course/<int:course_id>/upload', methods=['POST'])
@@ -274,6 +657,38 @@ def upload_video(course_id):
     
     return redirect(url_for('course', course_id=course_id))
 
+@app.route('/admin/course/<int:course_id>/pdf/upload', methods=['POST'])
+@login_required
+def upload_pdf(course_id):
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    if 'pdf' not in request.files:
+        flash('PDF dosyası bulunamadı.', 'danger')
+        return redirect(url_for('edit_course', course_id=course_id))
+    
+    file = request.files['pdf']
+    if file.filename == '':
+        flash('Dosya seçilmedi.', 'danger')
+        return redirect(url_for('edit_course', course_id=course_id))
+
+    if file:
+        filename = secure_filename(f"pdf_{course_id}_{datetime.utcnow().timestamp()}_{file.filename}")
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
+        new_pdf = Pdf(
+            title=request.form.get('title'),
+            pdf_path=filename,
+            course_id=course_id,
+            order=int(request.form.get('order'))
+        )
+        db.session.add(new_pdf)
+        db.session.commit()
+        flash('PDF materyal başarıyla eklendi.', 'success')
+    
+    return redirect(url_for('edit_course', course_id=course_id))
+
 @app.route('/admin/report')
 @login_required
 def generate_report():
@@ -292,7 +707,7 @@ def generate_report():
     ws.title = "Eğitim Raporu"
 
     # Başlıkları ekle
-    headers = ['Kullanıcı', 'E-posta', 'Kurs', 'Kategori', 'Tamamlanan Video', 'Toplam Video', 'İlerleme (%)', 'Test Sonucu', 'Durum', 'Tamamlanma Tarihi']
+    headers = ['Kullanıcı', 'E-posta', 'Kurs', 'Kategori', 'Tamamlanan İçerik', 'Toplam İçerik', 'İlerleme (%)', 'Test Sonucu', 'Durum', 'Tamamlanma Tarihi']
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = Font(bold=True, color='FFFFFF')
@@ -302,31 +717,39 @@ def generate_report():
 
     row = 2
     users = selected_course.assigned_users
-    videos = selected_course.videos
     for user in users:
-        completed_videos = 0
-        last_completed_at = ''
+        # Yeni progress sistemi ile hesapla
+        progress_details = selected_course.get_user_progress(user)
+        
+        # Test sonucu ve durumu
         test_score = '-'
         test_status = 'Devam Ediyor'
-        for video in videos:
+        last_completed_at = ''
+        
+        if progress_details.passed_test:
+            test_score = progress_details.test_score if progress_details.test_score is not None else '-'
+            test_status = 'Tamamlandı'
+        elif progress_details.is_completed:
+            test_status = 'Tamamlandı'
+        
+        # Son tamamlanma tarihini bul
+        latest_date = None
+        for video in selected_course.videos:
             progress = Progress.query.filter_by(user_id=user.id, video_id=video.id).first()
-            if progress and progress.completed:
-                completed_videos += 1
-                if progress.completed_at:
-                    last_completed_at = progress.completed_at.strftime('%Y-%m-%d %H:%M:%S')
-                if progress.test_score is not None:
-                    test_score = progress.test_score
-                if progress.test_completed:
-                    test_status = 'Tamamlandı'
-        total_videos = len(videos)
-        percent = int((completed_videos / total_videos) * 100) if total_videos else 0
+            if progress and progress.completed and progress.completed_at:
+                if latest_date is None or progress.completed_at > latest_date:
+                    latest_date = progress.completed_at
+        
+        if latest_date:
+            last_completed_at = latest_date.strftime('%Y-%m-%d %H:%M:%S')
+        
         ws.cell(row=row, column=1, value=f"{user.first_name} {user.last_name}")
         ws.cell(row=row, column=2, value=user.email)
         ws.cell(row=row, column=3, value=selected_course.title)
         ws.cell(row=row, column=4, value=selected_course.category.name if selected_course.category else '')
-        ws.cell(row=row, column=5, value=completed_videos)
-        ws.cell(row=row, column=6, value=total_videos)
-        percent_cell = ws.cell(row=row, column=7, value=f"{percent}%")
+        ws.cell(row=row, column=5, value=progress_details.completed_steps)
+        ws.cell(row=row, column=6, value=progress_details.total_steps)
+        percent_cell = ws.cell(row=row, column=7, value=f"{progress_details.progress_percent}%")
         percent_cell.alignment = Alignment(horizontal='center')
         percent_cell.fill = PatternFill(start_color='A1C4FD', end_color='A1C4FD', fill_type='solid')
         ws.cell(row=row, column=8, value=test_score)
@@ -353,103 +776,75 @@ def generate_report():
             except:
                 pass
         ws.column_dimensions[column].width = max_length + 4
-
-    report_path = os.path.join(app.config['UPLOAD_FOLDER'], f'report_{selected_course.id}.xlsx')
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx')
     wb.save(report_path)
-
     return send_file(report_path, as_attachment=True)
 
-@app.route('/video/<int:video_id>/complete', methods=['POST'])
+def check_course_completion(user, course):
+    """
+    Kullanıcının belirli bir kursu tamamlayıp tamamlamadığını kontrol eder.
+    Bu mantık artık Course modelindeki 'get_user_progress' metoduna taşındı.
+    """
+    return course.get_user_progress(user).is_completed
+
+@app.route('/complete-video/<int:video_id>', methods=['POST'])
 @login_required
 def complete_video(video_id):
-    print(f"DEBUG: Video complete called for video_id: {video_id}")
-    
+    """Video tamamlama isteğini (AJAX/Fetch) işler ve JSON döner."""
     video = Video.query.get_or_404(video_id)
-    print(f"DEBUG: Video found: {video.title}")
-    
     progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
+    
     if not progress:
         progress = Progress(user_id=current_user.id, video_id=video_id)
         db.session.add(progress)
-        print(f"DEBUG: Created new progress for user {current_user.id}")
-    
+
     progress.completed = True
     progress.completed_at = datetime.utcnow()
     db.session.commit()
-    print(f"DEBUG: Progress marked as completed")
+
+    return jsonify({'success': True, 'message': 'İlerleme kaydedildi.'})
+
+@app.route('/api/course/<int:course_id>/progress')
+@login_required
+def api_course_progress(course_id):
+    """Kurs ilerlemesini kontrol eden API endpoint'i."""
+    course = Course.query.get_or_404(course_id)
     
-    # Bir sonraki videoyu veya testi kontrol et
-    course = video.course
-    print(f"DEBUG: Course: {course.title}")
+    # Kullanıcının bu kurstaki video ilerlemelerini al
+    video_progress = {}
+    completed_videos = 0
     
-    # Mevcut videonun order'ına göre bir sonraki videoyu bul
-    videos = sorted(course.videos, key=lambda v: v.order)
-    print(f"DEBUG: Total videos in course: {len(videos)}")
-    
-    current_index = next((i for i, v in enumerate(videos) if v.id == video_id), -1)
-    print(f"DEBUG: Current video index: {current_index}")
-    
-    if current_index >= 0 and current_index < len(videos) - 1:
-        # Bir sonraki video var
-        next_video = videos[current_index + 1]
-        print(f"DEBUG: Next video found: {next_video.title}")
-        return jsonify({
-            'success': True, 
-            'next_url': url_for('video', video_id=next_video.id),
-            'message': 'Bir sonraki videoya geçiliyor...'
-        })
-    else:
-        print(f"DEBUG: This is the last video, checking for test...")
-        # Son video, test var mı kontrol et
-        completed_count = Progress.query.filter_by(
+    for video in course.videos:
+        progress = Progress.query.filter_by(
             user_id=current_user.id, 
-            completed=True
-        ).join(Video).filter(Video.course_id == course.id).count()
+            video_id=video.id
+        ).first()
         
-        total_count = len(course.videos)
-        print(f"DEBUG: Completed videos: {completed_count}/{total_count}")
-        
-        has_test = bool((course.test_pdf or course.test_images) and course.test_question_count and course.test_answer_key)
-        print(f"DEBUG: Course has test: {has_test}")
-        
-        if has_test and completed_count == total_count:
-            # Test var ve tüm videolar tamamlandı
-            last_video = videos[-1] if videos else None
-            test_progress = Progress.query.filter_by(
-                user_id=current_user.id, 
-                video_id=last_video.id
-            ).first() if last_video else None
-            
-            test_completed = test_progress and test_progress.test_completed
-            print(f"DEBUG: Test already completed: {test_completed}")
-            
-            if not test_completed:
-                print(f"DEBUG: Redirecting to test")
-                return jsonify({
-                    'success': True,
-                    'next_url': url_for('pdf_test', course_id=course.id),
-                    'message': 'Teste yönlendiriliyorsunuz...'
-                })
-            else:
-                print(f"DEBUG: Test already completed, going to dashboard")
-                return jsonify({
-                    'success': True,
-                    'next_url': url_for('dashboard'),
-                    'message': 'Kurs tamamlandı! Ana panele dönülüyor...'
-                })
-        else:
-            print(f"DEBUG: No test or not all videos completed, going to dashboard")
-            return jsonify({
-                'success': True,
-                'next_url': url_for('dashboard'),
-                'message': 'Kurs tamamlandı! Ana panele dönülüyor...'
-            })
+        video_progress[video.id] = progress.completed if progress else False
+        if video_progress[video.id]:
+            completed_videos += 1
     
-    print(f"DEBUG: Fallback return")
-    return jsonify({'success': True})
+    # Kurs bilgilerini hazırla
+    course_data = {
+        'id': course.id,
+        'title': course.title,
+        'test_pdf': course.test_pdf,
+        'test_images': course.test_images,
+        'videos': [{'id': v.id, 'title': v.title, 'order': v.order} for v in course.videos]
+    }
+    
+    return jsonify({
+        'success': True,
+        'course': course_data,
+        'completed_videos': completed_videos,
+        'total_videos': len(course.videos),
+        'video_progress': video_progress
+    })
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
@@ -468,20 +863,9 @@ def register():
             return render_template('register.html')
             
         # Güçlü şifre kontrolü
-        if len(password) < 8:
-            flash('Şifre en az 8 karakter olmalı.', 'danger')
-            return render_template('register.html')
-        if not any(c.isupper() for c in password):
-            flash('Şifre en az bir büyük harf içermeli.', 'danger')
-            return render_template('register.html')
-        if not any(c.islower() for c in password):
-            flash('Şifre en az bir küçük harf içermeli.', 'danger')
-            return render_template('register.html')
-        if not any(c.isdigit() for c in password):
-            flash('Şifre en az bir rakam içermeli.', 'danger')
-            return render_template('register.html')
-        if not any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
-            flash('Şifre en az bir özel karakter içermeli (!@#$%^&* vb.).', 'danger')
+        is_valid, message = password_policy_check(password)
+        if not is_valid:
+            flash(message, 'danger')
             return render_template('register.html')
             
         if User.query.filter_by(username=username).first():
@@ -596,7 +980,7 @@ def delete_user(user_id):
     flash('Kullanıcı başarıyla silindi.', 'success')
     return redirect(url_for('admin_users'))
 
-@app.route('/admin/course/<int:course_id>/edit', methods=['GET', 'POST'])
+@app.route('/admin/edit-course/<int:course_id>', methods=['GET', 'POST'])
 @login_required
 def edit_course(course_id):
     if not current_user.is_admin:
@@ -607,16 +991,20 @@ def edit_course(course_id):
         course.title = request.form.get('title')
         course.description = request.form.get('description')
         course.category_id = request.form.get('category_id')
-        course.certificate_type_id = request.form.get('certificate_type_id')
-        course.passing_score = request.form.get('passing_score', type=int)
-        
+        course.certificate_type_id = request.form.get('certificate_type_id') or None
+        course.passing_score = request.form.get('passing_score', 70, type=int)
+        course.test_required = 'test_required' in request.form
+
+        if course.certificate_type_id == 'yok':
+            course.certificate_type_id = None
+
         # Kullanıcı atama
         assigned_user_ids = request.form.getlist('assigned_users')
         course.assigned_users = User.query.filter(User.id.in_(assigned_user_ids)).all()
         
         db.session.commit()
-        flash('Kurs başarıyla güncellendi.')
-        return redirect(url_for('admin_courses'))
+        flash('Kurs başarıyla güncellendi.', 'success')
+        return redirect(url_for('admin_manage_course', course_id=course_id))
     
     users = User.query.filter_by(is_admin=False).all()
     categories = Category.query.all()
@@ -629,6 +1017,8 @@ def delete_course(course_id):
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
     course = Course.query.get_or_404(course_id)
+    upload_folder = app.config['UPLOAD_FOLDER']
+    
     # Önce testleri, soruları ve şıkları sil
     for test in course.tests:
         for question in test.questions:
@@ -636,55 +1026,82 @@ def delete_course(course_id):
                 db.session.delete(option)
             db.session.delete(question)
         db.session.delete(test)
+    
     # Kursun tüm videolarını ve ilerlemeleri sil
-    upload_folder = app.config['UPLOAD_FOLDER']
     for video in course.videos:
         # Video dosyasını sil
         video_path = os.path.join(upload_folder, video.video_path)
         if os.path.exists(video_path):
             try:
                 os.remove(video_path)
+                print(f"Video dosyası silindi: {video_path}")
             except Exception as e:
                 print(f"Video dosyası silinemedi: {video_path} - {e}")
         Progress.query.filter_by(video_id=video.id).delete()
         db.session.delete(video)
-    # Test PDF dosyasını sil
-    if course.test_pdf:
-        pdf_path = os.path.join(upload_folder, course.test_pdf)
+    
+    # Kursun tüm PDF dosyalarını sil
+    for pdf in course.pdfs:
+        # PDF progress kayıtlarını sil
+        PdfProgress.query.filter_by(pdf_id=pdf.id).delete()
+        
+        # PDF dosyasını sil
+        pdf_path = os.path.join(upload_folder, pdf.pdf_path)
         if os.path.exists(pdf_path):
             try:
                 os.remove(pdf_path)
+                print(f"PDF dosyası silindi: {pdf_path}")
             except Exception as e:
                 print(f"PDF dosyası silinemedi: {pdf_path} - {e}")
-    # Test fotoğraflarını sil
+        db.session.delete(pdf)
+    
+    # Test PDF dosyasını sil
+    if course.test_pdf:
+        test_pdf_path = os.path.join(upload_folder, course.test_pdf)
+        if os.path.exists(test_pdf_path):
+            try:
+                os.remove(test_pdf_path)
+                print(f"Test PDF dosyası silindi: {test_pdf_path}")
+            except Exception as e:
+                print(f"Test PDF dosyası silinemedi: {test_pdf_path} - {e}")
+    
+    # Test resim dosyasını sil (tek dosya)
     if course.test_images:
-        for img_filename in course.test_images.split(','):
-            img_path = os.path.join(upload_folder, img_filename)
-            if os.path.exists(img_path):
-                try:
-                    os.remove(img_path)
-                except Exception as e:
-                    print(f"Test fotoğrafı silinemedi: {img_path} - {e}")
+        test_img_path = os.path.join(upload_folder, course.test_images)
+        if os.path.exists(test_img_path):
+            try:
+                os.remove(test_img_path)
+                print(f"Test resim dosyası silindi: {test_img_path}")
+            except Exception as e:
+                print(f"Test resim dosyası silinemedi: {test_img_path} - {e}")
+    
     # Rapor dosyalarını sil
     # Tekli rapor
     report_path = os.path.join(upload_folder, f'report_{course.id}.xlsx')
     if os.path.exists(report_path):
         try:
             os.remove(report_path)
+            print(f"Rapor dosyası silindi: {report_path}")
         except Exception as e:
             print(f"Rapor dosyası silinemedi: {report_path} - {e}")
-    # Çoklu raporlar (multi_report_...xlsx)
-    for fname in os.listdir(upload_folder):
-        if fname.startswith('multi_report_') and fname.endswith('.xlsx'):
-            multi_report_path = os.path.join(upload_folder, fname)
-            if os.path.exists(multi_report_path):
+    
+    # Çoklu raporlar (multi_report_...xlsx) - tüm raporları sil
+    try:
+        for fname in os.listdir(upload_folder):
+            if fname.startswith('multi_report_') and fname.endswith('.xlsx'):
+                multi_report_path = os.path.join(upload_folder, fname)
                 try:
                     os.remove(multi_report_path)
+                    print(f"Multi rapor dosyası silindi: {multi_report_path}")
                 except Exception as e:
                     print(f"Multi rapor dosyası silinemedi: {multi_report_path} - {e}")
+    except Exception as e:
+        print(f"Upload klasörü okunamadı: {e}")
+    
+    # Database'den kursu sil
     db.session.delete(course)
     db.session.commit()
-    flash('Kurs ve tüm videoları/testleri ve dosyaları silindi.')
+    flash('Kurs ve tüm dosyaları başarıyla silindi.', 'success')
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/courses')
@@ -805,36 +1222,46 @@ def view_certificate(certificate_id):
 @login_required
 def print_certificate(certificate_id):
     certificate = Certificate.query.get_or_404(certificate_id)
-    if certificate.user_id != current_user.id and not current_user.is_admin:
+    if not current_user.is_admin and current_user.id != certificate.user_id:
         return redirect(url_for('dashboard'))
     return render_template('certificate_print.html', certificate=certificate)
 
-@app.route('/admin/generate-certificate/<int:user_id>', methods=['POST'])
+@app.route('/certificate/<int:certificate_id>/download')
 @login_required
-def generate_certificate(user_id):
+def download_certificate_pdf(certificate_id):
+    """Sertifika sayfasını render edip PDF olarak indirir."""
+    certificate = Certificate.query.get_or_404(certificate_id)
+    # Yetki kontrolü
+    if not current_user.is_admin and current_user.id != certificate.user_id:
+        flash('Bu işlemi yapmaya yetkiniz yok.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # Sertifika şablonunu render et
+    html_string = render_template('view_certificate.html', certificate=certificate, for_pdf=True)
+    html = HTML(string=html_string, base_url=request.url_root)
+    # PDF olarak döndür
+    return render_pdf(html, download_filename=f'sertifika_{certificate.certificate_number}.pdf')
+
+@app.route('/admin/generate-certificate/<int:user_id>/<int:course_id>', methods=['POST'])
+@login_required
+def admin_generate_certificate(user_id, course_id):
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
     
     user = User.query.get_or_404(user_id)
-    certificate_type_id = request.form.get('certificate_type_id', type=int)
-    certificate_type = CertificateType.query.get_or_404(certificate_type_id)
+    course = Course.query.get_or_404(course_id)
     
     # Kullanıcının tamamladığı kursları kontrol et
     completed_courses = []
-    for course in certificate_type.courses:
-        progress = Progress.query.filter_by(
-            user_id=user.id,
-            video_id=course.videos[-1].id,
-            test_completed=True
-        ).first()
-        if progress and progress.test_score >= course.passing_score:
-            completed_courses.append(course)
+    for c in course.assigned_users:
+        if check_course_completion(c, course):
+            completed_courses.append(c)
     
-    if len(completed_courses) >= certificate_type.required_course_count:
+    if len(completed_courses) >= course.certificate_type.required_course_count:
         # Belge oluştur
         certificate = Certificate(
             user_id=user.id,
-            certificate_type_id=certificate_type_id,
+            certificate_type_id=course.certificate_type_id,
             certificate_number=f"CERT-{uuid.uuid4().hex[:8].upper()}"
         )
         certificate.courses = completed_courses
@@ -949,7 +1376,7 @@ def download_multi_report():
         ws.cell(row=row, column=1).alignment = Alignment(horizontal='center')
         row += 1
         # Sütun başlıkları
-        headers = ['Kullanıcı Adı', 'E-posta', 'T. Video', 'Tamamlanan', 'İlerleme (%)', 'Test Sonucu', 'Durum', 'Son Tamamlanma']
+        headers = ['Kullanıcı Adı', 'E-posta', 'T. İçerik', 'Tamamlanan', 'İlerleme (%)', 'Test Sonucu', 'Durum', 'Son Tamamlanma']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=row, column=col, value=header)
             cell.font = Font(bold=True, color='FFFFFF')
@@ -959,27 +1386,36 @@ def download_multi_report():
         row += 1
         # Kullanıcı satırları
         for user in course.assigned_users:
-            completed_videos = 0
-            last_completed_at = ''
+            # Yeni progress sistemi ile hesapla
+            progress_details = course.get_user_progress(user)
+            
+            # Test sonucu ve durumu
             test_score = '-'
             test_status = 'Devam Ediyor'
+            last_completed_at = ''
+            
+            if progress_details.passed_test:
+                test_score = progress_details.test_score if progress_details.test_score is not None else '-'
+                test_status = 'Tamamlandı'
+            elif progress_details.is_completed:
+                test_status = 'Tamamlandı'
+            
+            # Son tamamlanma tarihini bul
+            latest_date = None
             for video in course.videos:
                 progress = Progress.query.filter_by(user_id=user.id, video_id=video.id).first()
-                if progress and progress.completed:
-                    completed_videos += 1
-                    if progress.completed_at:
-                        last_completed_at = progress.completed_at.strftime('%d.%m.%Y %H:%M')
-                    if progress.test_score is not None:
-                        test_score = progress.test_score
-                    if progress.test_completed:
-                        test_status = 'Tamamlandı'
-            total_videos = len(course.videos)
-            percent = int((completed_videos / total_videos) * 100) if total_videos else 0
+                if progress and progress.completed and progress.completed_at:
+                    if latest_date is None or progress.completed_at > latest_date:
+                        latest_date = progress.completed_at
+            
+            if latest_date:
+                last_completed_at = latest_date.strftime('%d.%m.%Y %H:%M')
+            
             ws.cell(row=row, column=1, value=f"{user.first_name} {user.last_name}")
             ws.cell(row=row, column=2, value=user.email)
-            ws.cell(row=row, column=3, value=total_videos)
-            ws.cell(row=row, column=4, value=completed_videos)
-            ws.cell(row=row, column=5, value=f"{percent}%")
+            ws.cell(row=row, column=3, value=progress_details.total_steps)
+            ws.cell(row=row, column=4, value=progress_details.completed_steps)
+            ws.cell(row=row, column=5, value=f"{progress_details.progress_percent}%")
             ws.cell(row=row, column=6, value=test_score)
             ws.cell(row=row, column=7, value=test_status)
             ws.cell(row=row, column=8, value=last_completed_at)
@@ -1066,51 +1502,69 @@ def pdf_test(course_id):
 def admin_certificate_operations():
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
-    from models import User, Course, CertificateType, Certificate, Progress, Video
+    
     courses = Course.query.all()
     certificate_types = CertificateType.query.all()
-    selected_course_id = request.args.get('course_id', type=int)
-    selected_course = Course.query.get(selected_course_id) if selected_course_id else None
+    course_id = request.args.get('course_id', type=int)
+    selected_course = Course.query.get(course_id) if course_id else None
+    
     eligible_users = []
     if selected_course:
-        videos = selected_course.videos
-        video_ids = set(v.id for v in videos)
         for user in selected_course.assigned_users:
-            completed_videos = len({p.video_id for p in user.progress if p.completed and p.video_id in video_ids})
-            total_videos = len(video_ids)
-            # Testi de tamamlamış olmalı (varsa)
-            test_ok = True
-            if (selected_course.test_pdf or selected_course.test_images) and selected_course.test_question_count and selected_course.test_answer_key:
-                last_video = sorted(videos, key=lambda v: v.order)[-1] if videos else None
-                progress = next((p for p in user.progress if p.video_id == (last_video.id if last_video else -1)), None)
-                test_ok = progress and progress.test_completed
-            if completed_videos == total_videos and total_videos > 0 and test_ok:
-                eligible_users.append(user)
+            # Kullanıcının bu kurs için zaten bir sertifikası olup olmadığını kontrol et
+            existing_cert = Certificate.query.filter(
+                Certificate.user_id == user.id,
+                Certificate.courses.any(id=selected_course.id)
+            ).first()
+
+            if not existing_cert:
+                user_progress = selected_course.get_user_progress(user)
+                # Sadece kursu tamamlayan kullanıcıları listeye ekle
+                if user_progress.is_completed:
+                    eligible_users.append({'user': user, 'progress': user_progress})
+
     if request.method == 'POST':
-        selected_user_ids = request.form.getlist('user_ids')
+        user_ids = request.form.getlist('user_ids')
         certificate_type_id = request.form.get('certificate_type_id')
-        cert_file = request.files.get('certificate_file')
-        if not selected_user_ids or not certificate_type_id or not cert_file or not cert_file.filename:
-            flash('Tüm alanları doldurun ve dosya seçin.')
-            return redirect(url_for('admin_certificate_operations', course_id=selected_course_id))
-        filename = secure_filename(f"admincert_{certificate_type_id}_{cert_file.filename}")
-        upload_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        cert_file.save(upload_path)
-        for user_id in selected_user_ids:
-            cert = Certificate(
-                user_id=user_id,
-                certificate_type_id=certificate_type_id,
-                certificate_number=f"ADMINCERT-{uuid.uuid4().hex[:8].upper()}",
-                certificate_file=filename
-            )
-            # İlgili kursu ilişkilendir
-            if selected_course:
-                cert.courses.append(selected_course)
-            db.session.add(cert)
+        certificate_file = request.files.get('certificate_file')
+
+        if not user_ids or not certificate_type_id:
+            flash('Lütfen kullanıcı ve belge türü seçin.', 'danger')
+            return redirect(url_for('admin_certificate_operations', course_id=course_id))
+
+        filename = None
+        if certificate_file and certificate_file.filename:
+            # Dosyayı güvenli bir şekilde kaydet
+            filename = secure_filename(f"cert_{datetime.utcnow().timestamp()}_{certificate_file.filename}")
+            upload_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            certificate_file.save(upload_path)
+        
+        # Seçilen her kullanıcı için sertifika oluştur
+        for user_id in user_ids:
+            user = User.query.get(user_id)
+            if user:
+                certificate = Certificate(
+                    user_id=user.id,
+                    certificate_type_id=certificate_type_id,
+                    certificate_number=f"CERT-{uuid.uuid4().hex[:8].upper()}",
+                    certificate_file=filename  # Dosya yoksa None (boş) olacak
+                )
+                # Sertifikayı kursla ilişkilendir
+                if selected_course:
+                    certificate.courses.append(selected_course)
+                
+                db.session.add(certificate)
+        
         db.session.commit()
-        flash('Sertifika(lar) başarıyla gönderildi!')
-        return redirect(url_for('admin_certificate_operations', course_id=selected_course_id))
-    return render_template('admin_certificate_operations.html', courses=courses, selected_course=selected_course, eligible_users=eligible_users, certificate_types=certificate_types)
+        flash(f'{len(user_ids)} kullanıcıya başarıyla sertifika atandı.', 'success')
+        return redirect(url_for('admin_certificate_operations', course_id=course_id))
+    
+    return render_template('admin_certificate_operations.html', 
+                           courses=courses, 
+                           selected_course=selected_course,
+                           eligible_users=eligible_users,
+                           certificate_types=certificate_types,
+                           course_id=course_id)
 
 @app.route('/admin/user-certificates', methods=['GET', 'POST'])
 @login_required
@@ -1131,10 +1585,22 @@ def admin_delete_certificate(certificate_id):
     if not current_user.is_admin:
         return redirect(url_for('dashboard'))
     cert = Certificate.query.get_or_404(certificate_id)
+    
+    # Sertifika dosyasını sil
+    if cert.certificate_file:
+        cert_path = os.path.join(app.config['UPLOAD_FOLDER'], cert.certificate_file)
+        if os.path.exists(cert_path):
+            try:
+                os.remove(cert_path)
+                print(f"Sertifika dosyası silindi: {cert_path}")
+            except Exception as e:
+                print(f"Sertifika dosyası silinemedi: {cert_path} - {e}")
+    
+    user_id = cert.user_id
     db.session.delete(cert)
     db.session.commit()
-    flash('Sertifika silindi.')
-    return redirect(url_for('admin_user_certificates', user_id=cert.user_id))
+    flash('Sertifika ve dosyası başarıyla silindi.')
+    return redirect(url_for('admin_user_certificates', user_id=user_id))
 
 @app.route('/admin/database')
 @login_required
@@ -1325,6 +1791,219 @@ def import_database():
         flash(f'Import hatası: {str(e)}', 'danger')
     
     return redirect(url_for('admin_database'))
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'message': 'E-posta adresi gerekli.', 'category': 'danger'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            # Aktif (onaylanmış veya bekleyen) bir istek var mı kontrol et
+            existing_request = PasswordReset.query.filter(
+                PasswordReset.user_id == user.id,
+                PasswordReset.status.in_(['pending', 'approved'])
+            ).first()
+
+            if existing_request:
+                # Eğer istek ONAYLANMIŞSA ve token geçerliyse, yenileme sayfasına yönlendir
+                if existing_request.status == 'approved' and existing_request.token and existing_request.expires_at > datetime.utcnow():
+                    return jsonify({
+                        'redirect_url': url_for('reset_password_with_token', token=existing_request.token)
+                    })
+                
+                # Eğer istek BEKLEMEDEYSE, bilgi ver
+                return jsonify({
+                    'message_long': get_status_message('pending', True), 
+                    'category': 'info'
+                })
+
+            # Aktif istek yoksa yeni bir tane oluştur
+            reset_request = PasswordReset(user_id=user.id)
+            db.session.add(reset_request)
+            db.session.commit()
+            
+            return jsonify({
+                'message_long': get_status_message('pending', True),
+                'category': 'success'
+            })
+        else:
+            return jsonify({'message': 'Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı.', 'category': 'danger'}), 404
+    
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password_with_token(token):
+    # Token'a göre isteği bul
+    reset_request = PasswordReset.query.filter_by(token=token, status='approved').first()
+
+    # Token geçerli değilse veya süresi dolmuşsa
+    if not reset_request or reset_request.expires_at < datetime.utcnow():
+        flash('Şifre sıfırlama linki geçersiz veya süresi dolmuş. Lütfen yeni bir istek gönderin.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        # Şifreyi güncelle ve isteği tamamla
+        user = reset_request.user
+        user.set_password(form.password.data)
+        reset_request.status = 'completed'
+        db.session.commit()
+
+        flash('Şifreniz başarıyla güncellendi! Yeni şifrenizle giriş yapabilirsiniz.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('reset_password_with_token.html', token=token, form=form)
+
+@app.route('/admin/password-requests')
+@login_required
+def admin_password_requests():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    pending_requests = PasswordReset.query.filter_by(status='pending').order_by(PasswordReset.requested_at.desc()).all()
+    
+    # Onaylanmış, tamamlanmış ve reddedilmiş olanlar
+    processed_requests = PasswordReset.query.filter(PasswordReset.status != 'pending').order_by(PasswordReset.approved_at.desc()).limit(20).all()
+    
+    return render_template('admin_password_requests.html', 
+                         pending_requests=pending_requests,
+                         processed_requests=processed_requests)
+
+@app.route('/admin/password-request/<int:request_id>/approve', methods=['POST'])
+@login_required
+def approve_password_request(request_id):
+    if not current_user.is_admin:
+        flash('Yetkisiz işlem.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    reset_request = PasswordReset.query.get_or_404(request_id)
+    
+    # Token oluştur ve son kullanma tarihi belirle (örn: 1 saat)
+    reset_request.token = secrets.token_urlsafe(32)
+    reset_request.expires_at = datetime.utcnow() + timedelta(hours=1)
+    reset_request.status = 'approved'
+    reset_request.approved_by = current_user.id
+    reset_request.approved_at = datetime.utcnow()
+    
+    db.session.commit()
+    flash(f'{reset_request.user.username} kullanıcısının isteği onaylandı. Kullanıcı artık şifresini sıfırlayabilir.', 'success')
+
+    return redirect(url_for('admin_password_requests'))
+
+@app.route('/admin/password-request/<int:request_id>/reject', methods=['POST'])
+@login_required
+def reject_password_request(request_id):
+    if not current_user.is_admin:
+        flash('Yetkisiz işlem.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    reset_request = PasswordReset.query.get_or_404(request_id)
+    reset_request.status = 'rejected'
+    reset_request.approved_by = current_user.id
+    reset_request.approved_at = datetime.utcnow()
+    db.session.commit()
+    
+    flash(f'{reset_request.user.username} kullanıcısının şifre sıfırlama isteği reddedildi.', 'warning')
+    return redirect(url_for('admin_password_requests'))
+
+@app.route('/check-password-status')
+def check_password_status():
+    email = request.args.get('email')
+    if not email:
+        return jsonify({'status': 'error', 'message': 'E-posta adresi gerekli'})
+    
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'status': 'error', 'message': 'Kullanıcı bulunamadı'})
+    
+    reset_request = PasswordReset.query.filter(
+        PasswordReset.user_id == user.id,
+        PasswordReset.status.in_(['pending', 'approved'])
+    ).order_by(PasswordReset.requested_at.desc()).first()
+    
+    if not reset_request:
+        return jsonify({'status': 'none', 'message': 'Aktif bir şifre sıfırlama isteği bulunamadı.'})
+    
+    response_data = {
+        'status': reset_request.status,
+        'message_long': get_status_message(reset_request.status, True),
+        'requested_at': reset_request.requested_at.strftime('%d.%m.%Y %H:%M')
+    }
+
+    if reset_request.status == 'approved':
+        response_data['token'] = reset_request.token
+
+    return jsonify(response_data)
+
+def get_status_message(status, long=False):
+    messages = {
+        'pending': 'İsteğiniz admin onayı için gönderildi. Lütfen daha sonra tekrar kontrol edin.',
+        'approved': 'İsteğiniz onaylandı! Şifrenizi şimdi sıfırlayabilirsiniz.',
+        'rejected': 'İsteğiniz reddedildi. Lütfen admin ile iletişime geçin.',
+        'completed': 'Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.'
+    }
+    long_messages = {
+        'pending': """
+            <strong>İsteğiniz Alındı ve Admin Onayına Gönderildi</strong><br>
+            <small>
+            Bir yöneticinin isteğinizi onaylaması gerekiyor. Onaylandıktan sonra bu sayfaya tekrar gelerek şifrenizi yenileyebilirsiniz.
+            </small>
+        """,
+        'approved': """
+            <strong>İsteğiniz Onaylandı!</strong><br>
+            <small>
+            Şimdi şifrenizi sıfırlayabilirsiniz. Lütfen aşağıdaki butonu kullanarak yeni şifrenizi belirleyin. Bu link 1 saat geçerlidir.
+            </small>
+        """,
+        'rejected': """
+            <strong>İsteğiniz Reddedildi</strong><br>
+            <small>
+            Şifre sıfırlama isteğiniz bir admin tarafından reddedildi. 
+            Daha fazla bilgi almak veya nedenini öğrenmek için lütfen kurumunuzun yetkilisiyle iletişime geçin.
+            </small>
+        """,
+        'completed': """
+            <strong>Şifreniz Zaten Güncellendi</strong><br>
+            <small>
+            Bu istek kullanılarak şifreniz daha önce güncellenmiş. Yeni şifrenizle giriş yapabilirsiniz. 
+            Tekrar sıfırlamak isterseniz, yeni bir istek oluşturun.
+            </small>
+        """
+    }
+    if long:
+        return long_messages.get(status, 'Bilinmeyen durum.')
+    return messages.get(status, 'Bilinmeyen durum')
+
+@app.route('/admin/manage-course/<int:course_id>', methods=['GET', 'POST'])
+@login_required
+def admin_manage_course(course_id):
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    categories = Category.query.all()
+    
+    if request.method == 'POST':
+        # Sadece kurs bilgilerini güncelle
+        course.title = request.form.get('title')
+        course.description = request.form.get('description')
+        course.category_id = request.form.get('category_id')
+        course.passing_score = request.form.get('passing_score', 70, type=int)
+        course.test_required = 'test_required' in request.form
+        
+        db.session.commit()
+        flash('Kurs bilgileri başarıyla güncellendi.', 'success')
+        return redirect(url_for('admin_manage_course', course_id=course_id))
+    
+    return render_template('admin_manage_course.html', course=course, categories=categories)
 
 if __name__ == '__main__':
     with app.app_context():

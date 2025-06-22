@@ -23,7 +23,14 @@
                 </form>
             </div>
             <div class="card-footer text-center">
-                <a href="{{ url_for('register') }}">Hesabınız yok mu? Kayıt olun.</a>
+                <div class="mb-2">
+                    <a href="{{ url_for('forgot_password') }}" class="text-decoration-none">
+                        <i class="bi bi-question-circle me-1"></i>Şifremi unuttum
+                    </a>
+                </div>
+                <div>
+                    <a href="{{ url_for('register') }}">Hesabınız yok mu? Kayıt olun.</a>
+                </div>
             </div>
         </div>
     </div>
