@@ -1136,6 +1136,196 @@ def admin_delete_certificate(certificate_id):
     flash('Sertifika silindi.')
     return redirect(url_for('admin_user_certificates', user_id=cert.user_id))
 
+@app.route('/admin/database')
+@login_required
+def admin_database():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    from models import User, Course, Video, Progress, Category, CertificateType, Certificate, Announcement
+    
+    # Database istatistikleri
+    stats = {
+        'users': User.query.count(),
+        'courses': Course.query.count(),
+        'videos': Video.query.count(),
+        'categories': Category.query.count(),
+        'certificate_types': CertificateType.query.count(),
+        'certificates': Certificate.query.count(),
+        'announcements': Announcement.query.count(),
+        'total_progress': Progress.query.count()
+    }
+    
+    # Son eklenen kayıtlar
+    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    recent_courses = Course.query.order_by(Course.created_at.desc()).limit(5).all()
+    
+    return render_template('admin_database.html', stats=stats, recent_users=recent_users, recent_courses=recent_courses)
+
+@app.route('/admin/database/backup', methods=['POST'])
+@login_required
+def backup_database():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    import shutil
+    from datetime import datetime
+    
+    try:
+        # Mevcut database dosyası
+        source_db = 'instance/isg.db'
+        if not os.path.exists(source_db):
+            flash('Database dosyası bulunamadı!', 'danger')
+            return redirect(url_for('admin_database'))
+        
+        # Yedek dosya adı
+        backup_name = f'isg_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
+        backup_path = os.path.join('instance', backup_name)
+        
+        # Database'i kopyala
+        shutil.copy2(source_db, backup_path)
+        
+        flash(f'Database başarıyla yedeklendi: {backup_name}', 'success')
+        
+    except Exception as e:
+        flash(f'Yedekleme hatası: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_database'))
+
+@app.route('/admin/database/reset', methods=['POST'])
+@login_required
+def reset_database():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Database'i sıfırla
+        from create_db import create_db
+        create_db()
+        flash('Database başarıyla sıfırlandı!', 'success')
+        
+    except Exception as e:
+        flash(f'Database sıfırlama hatası: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_database'))
+
+@app.route('/admin/database/export', methods=['POST'])
+@login_required
+def export_database():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    try:
+        import sqlite3
+        import json
+        from datetime import datetime
+        
+        # Database bağlantısı
+        conn = sqlite3.connect('instance/isg.db')
+        cursor = conn.cursor()
+        
+        # Tüm tabloları al
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        
+        export_data = {}
+        
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"SELECT * FROM {table_name}")
+            rows = cursor.fetchall()
+            
+            # Sütun adlarını al
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            # Verileri dictionary formatında sakla
+            table_data = []
+            for row in rows:
+                row_dict = {}
+                for i, value in enumerate(row):
+                    if isinstance(value, datetime):
+                        value = value.isoformat()
+                    row_dict[columns[i]] = value
+                table_data.append(row_dict)
+            
+            export_data[table_name] = table_data
+        
+        conn.close()
+        
+        # JSON dosyası olarak kaydet
+        export_filename = f'database_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+        export_path = os.path.join('static', 'uploads', export_filename)
+        
+        with open(export_path, 'w', encoding='utf-8') as f:
+            json.dump(export_data, f, ensure_ascii=False, indent=2)
+        
+        return send_file(export_path, as_attachment=True, download_name=export_filename)
+        
+    except Exception as e:
+        flash(f'Export hatası: {str(e)}', 'danger')
+        return redirect(url_for('admin_database'))
+
+@app.route('/admin/database/import', methods=['POST'])
+@login_required
+def import_database():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    
+    if 'database_file' not in request.files:
+        flash('Dosya seçilmedi!', 'danger')
+        return redirect(url_for('admin_database'))
+    
+    file = request.files['database_file']
+    if file.filename == '':
+        flash('Dosya seçilmedi!', 'danger')
+        return redirect(url_for('admin_database'))
+    
+    if not file.filename.endswith('.json'):
+        flash('Sadece JSON dosyaları kabul edilir!', 'danger')
+        return redirect(url_for('admin_database'))
+    
+    try:
+        import json
+        import sqlite3
+        
+        # JSON dosyasını oku
+        data = json.load(file)
+        
+        # Database bağlantısı
+        conn = sqlite3.connect('instance/isg.db')
+        cursor = conn.cursor()
+        
+        # Mevcut verileri temizle
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"DELETE FROM {table_name}")
+        
+        # Yeni verileri ekle
+        for table_name, table_data in data.items():
+            if table_data:
+                # İlk satırdan sütun adlarını al
+                columns = list(table_data[0].keys())
+                placeholders = ', '.join(['?' for _ in columns])
+                column_names = ', '.join(columns)
+                
+                for row in table_data:
+                    values = [row.get(col) for col in columns]
+                    cursor.execute(f"INSERT INTO {table_name} ({column_names}) VALUES ({placeholders})", values)
+        
+        conn.commit()
+        conn.close()
+        
+        flash('Database başarıyla import edildi!', 'success')
+        
+    except Exception as e:
+        flash(f'Import hatası: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_database'))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

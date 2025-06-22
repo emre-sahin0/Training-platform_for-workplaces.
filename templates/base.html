@@ -60,6 +60,10 @@
             <a href="{{ url_for('admin_user_certificates') }}" class="sidebar-link">
                 <i class="bi bi-file-earmark-medical"></i>Sertifikaları Yönet
             </a>
+            <hr class="sidebar-divider">
+            <a href="{{ url_for('admin_database') }}" class="sidebar-link">
+                <i class="bi bi-database-fill"></i>Database Yönetimi
+            </a>
         </nav>
         {% elif current_user.is_authenticated %}
         <nav id="sidebarMenu">

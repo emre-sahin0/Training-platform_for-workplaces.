@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-hero py-4 px-3 mb-4 rounded-4 text-white" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%);">
+    <h2 class="fw-bold mb-1"><i class="bi bi-database-fill me-2"></i>Database Yönetimi</h2>
+    <p class="mb-0 opacity-75">Veritabanı işlemleri ve istatistikler</p>
+</div>
+
+<!-- İstatistikler -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ stats.users }}</h3>
+                <small>Kullanıcı</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ stats.courses }}</h3>
+                <small>Kurs</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ stats.videos }}</h3>
+                <small>Video</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ stats.total_progress }}</h3>
+                <small>İlerleme Kaydı</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Database İşlemleri -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-shield-check me-2"></i>Database Güvenliği</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('backup_database') }}" method="POST" class="mb-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-download me-2"></i>Database Yedekle
+                    </button>
+                </form>
+                
+                <form action="{{ url_for('export_database') }}" method="POST" class="mb-3">
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-file-earmark-arrow-down me-2"></i>JSON Olarak Export Et
+                    </button>
+                </form>
+                
+                <form action="{{ url_for('import_database') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="database_file" class="form-label">JSON Dosyası Seç</label>
+                        <input type="file" class="form-control" id="database_file" name="database_file" accept=".json" required>
+                    </div>
+                    <button type="submit" class="btn btn-info w-100">
+                        <i class="bi bi-upload me-2"></i>Database Import Et
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-arrow-clockwise me-2"></i>Database Sıfırlama</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Dikkat!</strong> Bu işlem tüm verileri silecek ve temel yapıyı yeniden oluşturacak.
+                </div>
+                
+                <form action="{{ url_for('reset_database') }}" method="POST" onsubmit="return confirm('Tüm veriler silinecek! Devam etmek istediğinize emin misiniz?');">
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="bi bi-trash me-2"></i>Database'i Sıfırla
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Son Eklenen Kayıtlar -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-people me-2"></i>Son Eklenen Kullanıcılar</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_users %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Kullanıcı Adı</th>
+                                <th>Ad Soyad</th>
+                                <th>E-posta</th>
+                                <th>Tarih</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in recent_users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.first_name }} {{ user.last_name }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ user.created_at.strftime('%d.%m.%Y') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">Henüz kullanıcı bulunmuyor.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-journal-bookmark me-2"></i>Son Eklenen Kurslar</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_courses %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Kurs Adı</th>
+                                <th>Kategori</th>
+                                <th>Tarih</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for course in recent_courses %}
+                            <tr>
+                                <td>{{ course.title }}</td>
+                                <td>{{ course.category.name if course.category else '-' }}</td>
+                                <td>{{ course.created_at.strftime('%d.%m.%Y') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">Henüz kurs bulunmuyor.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detaylı İstatistikler -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5><i class="bi bi-bar-chart me-2"></i>Detaylı İstatistikler</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-primary">{{ stats.categories }}</h4>
+                    <small class="text-muted">Kategori</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-success">{{ stats.certificate_types }}</h4>
+                    <small class="text-muted">Sertifika Türü</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-info">{{ stats.certificates }}</h4>
+                    <small class="text-muted">Sertifika</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-warning">{{ stats.announcements }}</h4>
+                    <small class="text-muted">Duyuru</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

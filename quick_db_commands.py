@@ -11,12 +11,12 @@ def create_admin_user():
             last_name='User',
             is_admin=True
         )
-        admin.set_password('Admin123!')
+        admin.set_password('Admin.,4321!')
         db.session.add(admin)
         db.session.commit()
         print("✅ Admin kullanıcısı oluşturuldu!")
         print("   Kullanıcı adı: admin")
-        print("   Şifre: Admin123!")
+        print("   Şifre: Admin.,4321!")
 
 def clear_all_data():
     """Tüm verileri temizle (tablolar kalır)"""
@@ -37,6 +37,18 @@ def show_user_count():
             users = User.query.all()
             for user in users:
                 print(f"  • {user.username} ({user.email}) - {'Admin' if user.is_admin else 'User'}")
+
+def update_admin_password():
+    """Admin şifresini güncelle"""
+    with app.app_context():
+        admin = User.query.filter_by(username='admin').first()
+        if admin:
+            admin.set_password('Admin.,4321!')
+            db.session.commit()
+            print("✅ Admin şifresi güncellendi!")
+            print("   Yeni şifre: Admin.,4321!")
+        else:
+            print("❌ Admin kullanıcısı bulunamadı!")
 
 if __name__ == '__main__':
     print("=== Hızlı DB Komutları ===")
