@@ -591,9 +591,7 @@ def new_course():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        # Quick file check - performance optimized
         print(f"🚀 Starting course creation process...")
-        # Temel kurs bilgilerini al
         title = request.form.get('title')
         description = request.form.get('description')
         category_id = request.form.get('category_id')
@@ -601,53 +599,41 @@ def new_course():
         passing_score = request.form.get('passing_score', 70, type=int)
         test_required = 'test_required' in request.form
 
-        # Yeni kursu oluştur ve session'a ekle
+        print("1. Kurs nesnesi oluşturuluyor...")
         new_course = Course(
             title=title, 
             description=description, 
             category_id=category_id,
             passing_score=passing_score,
             test_required=test_required,
-            certificate_type_id=None # Şimdilik boş, gerekirse güncellenebilir
+            certificate_type_id=None
         )
         db.session.add(new_course)
-        
-        # Performance Critical: Single Transaction Approach
         try:
-            # Kullanıcıları ata
+            print("2. Kullanıcılar atanıyor...")
             new_course.assigned_users = User.query.filter(User.id.in_(assigned_user_ids)).all()
-
-            # İlk commit - kurs ID'sini al
+            print("3. İlk commit (kurs ID'si alınacak)...")
             db.session.commit()
             print(f"✅ Course created with ID: {new_course.id}")
 
-            # Dosya işlemleri - optimized approach
             content_titles = request.form.getlist('content_titles[]')
             content_types = request.form.getlist('content_types[]')
             content_orders = request.form.getlist('content_orders[]')
             content_files = request.files.getlist('content_files[]')
 
-            # Memory efficient processing
             items_to_add = []
             upload_folder = app.config['UPLOAD_FOLDER']
-            
-            print(f"📁 Processing {len(content_files)} files...")
-            
+            print(f"4. Dosya işlemleri başlıyor, toplam {len(content_files)} dosya...")
             for i, file in enumerate(content_files):
                 if file and file.filename:
                     content_type = content_types[i]
                     timestamp = int(datetime.utcnow().timestamp())
-                    
-                    # Fast filename generation
                     filename = f"{content_type}_{new_course.id}_{timestamp}_{secure_filename(file.filename)}"
                     file_path = os.path.join(upload_folder, filename)
-                    
-                    # Direct file save - no size checking for speed
                     try:
-                        print(f"⬆️  Saving {filename}...")
+                        print(f"4.{i+1} Dosya kaydediliyor: {filename}")
                         file.save(file_path)
-                        
-                        # Create database object
+                        print(f"4.{i+1} Dosya kaydedildi: {filename}")
                         if content_type == 'video':
                             item = Video(
                                 title=content_titles[i],
@@ -655,36 +641,28 @@ def new_course():
                                 course_id=new_course.id,
                                 order=int(content_orders[i])
                             )
-                        else:  # pdf
+                        else:
                             item = Pdf(
                                 title=content_titles[i],
                                 pdf_path=filename,
                                 course_id=new_course.id,
                                 order=int(content_orders[i])
                             )
-                        
                         items_to_add.append(item)
-                        print(f"✅ {filename} processed")
-                        
+                        print(f"4.{i+1} DB nesnesi hazır: {filename}")
                     except Exception as e:
                         print(f"❌ Error saving {filename}: {e}")
                         flash(f'Dosya kaydedilemedi: {file.filename}', 'warning')
-            
-            # Single batch insert for all items
             if items_to_add:
-                print(f"💾 Batch inserting {len(items_to_add)} items to database...")
+                print(f"5. DB'ye toplu ekleme başlıyor ({len(items_to_add)} adet)...")
                 db.session.add_all(items_to_add)
-            
-            # Test dosyası işleme - Speed optimized
             if new_course.test_required:
                 test_file = request.files.get('test_file')
                 pdf_question_count = request.form.get('pdf_question_count')
                 pdf_answer_key = request.form.get('pdf_answer_key')
-
                 if test_file and test_file.filename and pdf_question_count and pdf_answer_key:
                     ext = os.path.splitext(test_file.filename)[1].lower()
                     try:
-                        # Fast test file processing
                         if ext == '.pdf':
                             filename = f"test_{new_course.id}_{secure_filename(test_file.filename)}"
                             new_course.test_pdf = filename
@@ -695,31 +673,25 @@ def new_course():
                             new_course.test_pdf = None
                         else:
                             filename = None
-                        
                         if filename:
-                            print(f"⬆️  Saving test file: {filename}")
+                            print(f"6. Test dosyası kaydediliyor: {filename}")
                             test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                             new_course.test_question_count = int(pdf_question_count)
                             new_course.test_answer_key = pdf_answer_key
-                            print(f"✅ Test file saved")
+                            print(f"6. Test dosyası kaydedildi: {filename}")
                     except Exception as e:
                         print(f"❌ Test file error: {e}")
                         flash(f'Test dosyası kaydedilemedi: {str(e)}', 'warning')
-            
-            # Final commit - everything in one transaction
-            print(f"💾 Final commit...")
+            print(f"7. Final commit başlıyor...")
             db.session.commit()
-            print(f"🎉 Course creation completed successfully!")
+            print(f"🎉 Kurs oluşturma tamamlandı!")
             flash('🎉 Kurs başarıyla oluşturuldu!', 'success')
             return redirect(url_for('dashboard'))
-            
         except Exception as e:
             print(f"❌ Course creation error: {e}")
             db.session.rollback()
             flash(f'Kurs oluşturma hatası: {str(e)}', 'danger')
             return redirect(url_for('new_course'))
-
-    # GET request için
     users = User.query.filter_by(is_admin=False).all()
     categories = Category.query.all()
     return render_template('new_course.html', users=users, categories=categories)
