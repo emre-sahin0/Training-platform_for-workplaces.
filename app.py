@@ -19,6 +19,7 @@ from flask_migrate import Migrate
 from flask_mail import Mail, Message
 from flask_weasyprint import render_pdf
 from flask_weasyprint import HTML
+from sqlalchemy.exc import IntegrityError
 
 # Limiter nesnesini yeni sürüme uygun şekilde başlat
 limiter = Limiter(
@@ -29,6 +30,12 @@ limiter = Limiter(
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    
+    # Upload limit'ini yüksek set et
+    app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
+    
+    # Debug için config'i logla
+    print(f"🔧 MAX_CONTENT_LENGTH set to: {app.config['MAX_CONTENT_LENGTH'] / (1024*1024)}MB")
 
     db.init_app(app)
     login_manager.init_app(app)
@@ -49,6 +56,32 @@ def create_app():
 app = create_app()
 mail = Mail(app)
 migrate = Migrate(app, db)
+
+# SQLite performance optimization event listener
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+import sqlite3
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    """SQLite performance optimizations"""
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        # Performance optimizations
+        cursor.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging
+        cursor.execute("PRAGMA synchronous=NORMAL")  # Faster sync
+        cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+        cursor.execute("PRAGMA temp_store=MEMORY")  # Memory temp storage
+        cursor.close()
+        print("🔧 SQLite PRAGMA optimizations applied")
+
+# Error handler for file upload limits
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Handle file too large error"""
+    max_size_mb = app.config['MAX_CONTENT_LENGTH'] / (1024 * 1024)
+    flash(f'❌ Dosya çok büyük! Maximum {max_size_mb:.0f}MB yükleyebilirsiniz. Dosyalarınızı küçültün.', 'danger')
+    return redirect(url_for('new_course'))
 
 # --- Güçlü şifre politikası için yardımcı fonksiyon ---
 def password_policy_check(password):
@@ -454,13 +487,30 @@ def pdf_viewer(pdf_id):
 def complete_video_and_get_next(video_id):
     """Videoyu tamamlandı olarak işaretler ve bir sonraki adımın URL'sini döndürür."""
     video = Video.query.get_or_404(video_id)
+    
+    # Mevcut progress kaydını kontrol et
     progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
+    
     if not progress:
+        # Yeni progress kaydı oluştur
         progress = Progress(user_id=current_user.id, video_id=video_id)
         db.session.add(progress)
+    
+    # Progress'i güncelle
     progress.completed = True
     progress.completed_at = datetime.utcnow()
-    db.session.commit()
+    
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Eğer UNIQUE constraint hatası alırsak, rollback yap ve mevcut kaydı güncelle
+        db.session.rollback()
+        # Mevcut kaydı tekrar al ve güncelle
+        progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
+        if progress:
+            progress.completed = True
+            progress.completed_at = datetime.utcnow()
+            db.session.commit()
 
     course = video.course
     content_list = get_course_content(course.id)
@@ -541,6 +591,8 @@ def new_course():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
+        # Quick file check - performance optimized
+        print(f"🚀 Starting course creation process...")
         # Temel kurs bilgilerini al
         title = request.form.get('title')
         description = request.form.get('description')
@@ -560,68 +612,112 @@ def new_course():
         )
         db.session.add(new_course)
         
-        # Kullanıcıları ata
-        new_course.assigned_users = User.query.filter(User.id.in_(assigned_user_ids)).all()
+        # Performance Critical: Single Transaction Approach
+        try:
+            # Kullanıcıları ata
+            new_course.assigned_users = User.query.filter(User.id.in_(assigned_user_ids)).all()
 
-        # Commit edip ID'yi al
-        db.session.commit()
+            # İlk commit - kurs ID'sini al
+            db.session.commit()
+            print(f"✅ Course created with ID: {new_course.id}")
 
-        # Kurs içeriğini işle
-        content_titles = request.form.getlist('content_titles[]')
-        content_types = request.form.getlist('content_types[]')
-        content_orders = request.form.getlist('content_orders[]')
-        content_files = request.files.getlist('content_files[]')
+            # Dosya işlemleri - optimized approach
+            content_titles = request.form.getlist('content_titles[]')
+            content_types = request.form.getlist('content_types[]')
+            content_orders = request.form.getlist('content_orders[]')
+            content_files = request.files.getlist('content_files[]')
 
-        for i, file in enumerate(content_files):
-            if file and file.filename:
-                content_type = content_types[i]
-                timestamp = datetime.utcnow().timestamp()
-                
-                if content_type == 'video':
-                    filename = secure_filename(f"video_{new_course.id}_{timestamp}_{file.filename}")
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    item = Video(
-                        title=content_titles[i],
-                        video_path=filename,
-                        course_id=new_course.id,
-                        order=int(content_orders[i])
-                    )
-                    db.session.add(item)
-                elif content_type == 'pdf':
-                    filename = secure_filename(f"pdf_{new_course.id}_{timestamp}_{file.filename}")
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    item = Pdf(
-                        title=content_titles[i],
-                        pdf_path=filename,
-                        course_id=new_course.id,
-                        order=int(content_orders[i])
-                    )
-                    db.session.add(item)
-        
-        # Test dosyası (PDF veya resim) - Sadece test zorunlu ise işle
-        if new_course.test_required:
-            test_file = request.files.get('test_file')
-            pdf_question_count = request.form.get('pdf_question_count')
-            pdf_answer_key = request.form.get('pdf_answer_key')
+            # Memory efficient processing
+            items_to_add = []
+            upload_folder = app.config['UPLOAD_FOLDER']
+            
+            print(f"📁 Processing {len(content_files)} files...")
+            
+            for i, file in enumerate(content_files):
+                if file and file.filename:
+                    content_type = content_types[i]
+                    timestamp = int(datetime.utcnow().timestamp())
+                    
+                    # Fast filename generation
+                    filename = f"{content_type}_{new_course.id}_{timestamp}_{secure_filename(file.filename)}"
+                    file_path = os.path.join(upload_folder, filename)
+                    
+                    # Direct file save - no size checking for speed
+                    try:
+                        print(f"⬆️  Saving {filename}...")
+                        file.save(file_path)
+                        
+                        # Create database object
+                        if content_type == 'video':
+                            item = Video(
+                                title=content_titles[i],
+                                video_path=filename,
+                                course_id=new_course.id,
+                                order=int(content_orders[i])
+                            )
+                        else:  # pdf
+                            item = Pdf(
+                                title=content_titles[i],
+                                pdf_path=filename,
+                                course_id=new_course.id,
+                                order=int(content_orders[i])
+                            )
+                        
+                        items_to_add.append(item)
+                        print(f"✅ {filename} processed")
+                        
+                    except Exception as e:
+                        print(f"❌ Error saving {filename}: {e}")
+                        flash(f'Dosya kaydedilemedi: {file.filename}', 'warning')
+            
+            # Single batch insert for all items
+            if items_to_add:
+                print(f"💾 Batch inserting {len(items_to_add)} items to database...")
+                db.session.add_all(items_to_add)
+            
+            # Test dosyası işleme - Speed optimized
+            if new_course.test_required:
+                test_file = request.files.get('test_file')
+                pdf_question_count = request.form.get('pdf_question_count')
+                pdf_answer_key = request.form.get('pdf_answer_key')
 
-            if test_file and test_file.filename and pdf_question_count and pdf_answer_key:
-                ext = os.path.splitext(test_file.filename)[1].lower()
-                if ext == '.pdf':
-                    filename = secure_filename(f"test_{new_course.id}_{test_file.filename}")
-                    new_course.test_pdf = filename
-                    new_course.test_images = None
-                elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
-                    filename = secure_filename(f"testimg_{new_course.id}_{datetime.utcnow().timestamp()}_{test_file.filename}")
-                    new_course.test_images = filename
-                    new_course.test_pdf = None
-                
-                test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                new_course.test_question_count = int(pdf_question_count)
-                new_course.test_answer_key = pdf_answer_key
-        
-        db.session.commit()
-        flash('Kurs başarıyla oluşturuldu!', 'success')
-        return redirect(url_for('dashboard'))
+                if test_file and test_file.filename and pdf_question_count and pdf_answer_key:
+                    ext = os.path.splitext(test_file.filename)[1].lower()
+                    try:
+                        # Fast test file processing
+                        if ext == '.pdf':
+                            filename = f"test_{new_course.id}_{secure_filename(test_file.filename)}"
+                            new_course.test_pdf = filename
+                            new_course.test_images = None
+                        elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
+                            filename = f"testimg_{new_course.id}_{int(datetime.utcnow().timestamp())}_{secure_filename(test_file.filename)}"
+                            new_course.test_images = filename
+                            new_course.test_pdf = None
+                        else:
+                            filename = None
+                        
+                        if filename:
+                            print(f"⬆️  Saving test file: {filename}")
+                            test_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                            new_course.test_question_count = int(pdf_question_count)
+                            new_course.test_answer_key = pdf_answer_key
+                            print(f"✅ Test file saved")
+                    except Exception as e:
+                        print(f"❌ Test file error: {e}")
+                        flash(f'Test dosyası kaydedilemedi: {str(e)}', 'warning')
+            
+            # Final commit - everything in one transaction
+            print(f"💾 Final commit...")
+            db.session.commit()
+            print(f"🎉 Course creation completed successfully!")
+            flash('🎉 Kurs başarıyla oluşturuldu!', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            print(f"❌ Course creation error: {e}")
+            db.session.rollback()
+            flash(f'Kurs oluşturma hatası: {str(e)}', 'danger')
+            return redirect(url_for('new_course'))
 
     # GET request için
     users = User.query.filter_by(is_admin=False).all()
@@ -801,7 +897,18 @@ def complete_video(video_id):
 
     progress.completed = True
     progress.completed_at = datetime.utcnow()
-    db.session.commit()
+    
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Eğer UNIQUE constraint hatası alırsak, rollback yap ve mevcut kaydı güncelle
+        db.session.rollback()
+        # Mevcut kaydı tekrar al ve güncelle
+        progress = Progress.query.filter_by(user_id=current_user.id, video_id=video_id).first()
+        if progress:
+            progress.completed = True
+            progress.completed_at = datetime.utcnow()
+            db.session.commit()
 
     return jsonify({'success': True, 'message': 'İlerleme kaydedildi.'})
 

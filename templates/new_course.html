@@ -83,8 +83,34 @@
                     
                     <hr class="my-4">
 
+                    <!-- Upload Progress Bar -->
+                    <div id="upload-progress" class="mb-3" style="display: none;">
+                        <div class="alert alert-info">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm me-3" role="status"></div>
+                                <div class="flex-grow-1">
+                                    <div><strong>Kurs oluşturuluyor...</strong></div>
+                                    <div class="progress mt-2">
+                                        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <small id="progress-text" class="text-muted">Dosyalar işleniyor...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Size Warning -->
+                    <div id="file-size-warning" class="alert alert-warning" style="display: none;">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Uyarı:</strong> Büyük dosyalar yükleniyor. İşlem uzun sürebilir.
+                    </div>
+
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Kursu Oluştur</button>
+                        <button type="submit" id="submit-btn" class="btn btn-primary">
+                            <span id="submit-text">Kursu Oluştur</span>
+                            <span id="submit-spinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -157,6 +183,66 @@
 {% block scripts %}
 <script>
 let contentOrder = 0;
+let totalUploadSize = 0;
+let largeFileWarningShown = false;
+
+// File size constants (in bytes)
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100MB
+const WARNING_TOTAL_SIZE = 1000 * 1024 * 1024; // 1GB total
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function checkFileSize(fileInput) {
+    const file = fileInput.files[0];
+    if (!file) return true;
+    
+    const fileSize = file.size;
+    const fileName = file.name;
+    
+    // Maximum file size check
+    if (fileSize > MAX_FILE_SIZE) {
+        alert(`❌ Dosya çok büyük!\n\n${fileName}: ${formatFileSize(fileSize)}\nMaximum: ${formatFileSize(MAX_FILE_SIZE)}\n\nLütfen daha küçük bir dosya seçin.`);
+        fileInput.value = '';
+        return false;
+    }
+    
+    // Large file warning
+    if (fileSize > LARGE_FILE_THRESHOLD) {
+        if (!largeFileWarningShown) {
+            document.getElementById('file-size-warning').style.display = 'block';
+            largeFileWarningShown = true;
+        }
+        console.log(`⚠️ Büyük dosya: ${fileName} (${formatFileSize(fileSize)})`);
+    }
+    
+    return true;
+}
+
+function calculateTotalUploadSize() {
+    totalUploadSize = 0;
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    
+    fileInputs.forEach(input => {
+        if (input.files[0]) {
+            totalUploadSize += input.files[0].size;
+        }
+    });
+    
+    // Show warning if total size is large
+    if (totalUploadSize > WARNING_TOTAL_SIZE) {
+        document.getElementById('file-size-warning').style.display = 'block';
+        largeFileWarningShown = true;
+    }
+    
+    console.log(`📊 Toplam upload boyutu: ${formatFileSize(totalUploadSize)}`);
+}
 
 function addContentInput(type) {
     const container = document.getElementById('content-inputs');
@@ -165,6 +251,7 @@ function addContentInput(type) {
     
     const fileAccept = type === 'video' ? 'video/*' : 'application/pdf';
     const placeholder = type === 'video' ? 'Video Başlığı' : 'PDF Başlığı';
+    const maxSizeText = type === 'video' ? '(Max: 500MB)' : '(Max: 500MB)';
 
     row.innerHTML = `
         <input type="hidden" name="content_types[]" value="${type}">
@@ -176,13 +263,23 @@ function addContentInput(type) {
             <input type="text" class="form-control" name="content_titles[]" placeholder="${placeholder}" required>
         </div>
         <div class="col-md-5">
-            <input type="file" class="form-control" name="content_files[]" accept="${fileAccept}" required>
+            <input type="file" class="form-control file-input" name="content_files[]" accept="${fileAccept}" required>
+            <small class="text-muted">${maxSizeText}</small>
         </div>
         <div class="col-md-1 text-end">
-            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.content-input-row').remove(); updateContentOrder();">Kaldır</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.content-input-row').remove(); updateContentOrder(); calculateTotalUploadSize();">Kaldır</button>
         </div>
     `;
     container.appendChild(row);
+    
+    // Add file size check to the new file input
+    const fileInput = row.querySelector('.file-input');
+    fileInput.addEventListener('change', function() {
+        if (checkFileSize(this)) {
+            calculateTotalUploadSize();
+        }
+    });
+    
     contentOrder++;
 }
 
@@ -237,6 +334,80 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleTestFields();
         testRequiredCheckbox.addEventListener('change', toggleTestFields);
     }
+
+    // Test file size check
+    const testFileInput = document.querySelector('input[name="test_file"]');
+    if (testFileInput) {
+        testFileInput.addEventListener('change', function() {
+            checkFileSize(this);
+            calculateTotalUploadSize();
+        });
+    }
+
+    // Form submission handling with progress tracking
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submit-btn');
+    const submitText = document.getElementById('submit-text');
+    const submitSpinner = document.getElementById('submit-spinner');
+    const uploadProgress = document.getElementById('upload-progress');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+
+    form.addEventListener('submit', function(e) {
+        // Validate all files before submission
+        const fileInputs = document.querySelectorAll('input[type="file"]');
+        let hasValidationError = false;
+        
+        fileInputs.forEach(input => {
+            if (input.files[0] && !checkFileSize(input)) {
+                hasValidationError = true;
+            }
+        });
+        
+        if (hasValidationError) {
+            e.preventDefault();
+            return;
+        }
+
+        // Calculate final total size
+        calculateTotalUploadSize();
+        
+        // Show progress and disable submit button
+        submitBtn.disabled = true;
+        submitText.textContent = 'Yükleniyor...';
+        submitSpinner.style.display = 'inline-block';
+        uploadProgress.style.display = 'block';
+        
+        // Simulate progress (since we can't track real upload progress with regular form submission)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) {
+                progress = 90;
+                clearInterval(progressInterval);
+                progressText.textContent = 'Son işlemler yapılıyor...';
+            }
+            progressBar.style.width = progress + '%';
+            
+            if (progress < 30) {
+                progressText.textContent = 'Dosyalar yükleniyor...';
+            } else if (progress < 60) {
+                progressText.textContent = 'Kurs oluşturuluyor...';
+            } else if (progress < 90) {
+                progressText.textContent = 'İçerik işleniyor...';
+            }
+        }, 500);
+        
+        // Show estimated time based on file size
+        const estimatedSeconds = Math.ceil(totalUploadSize / (1024 * 1024)); // Rough estimate: 1MB per second
+        if (estimatedSeconds > 10) {
+            setTimeout(() => {
+                if (!form.submitted) {
+                    progressText.textContent = `Tahmini süre: ${estimatedSeconds} saniye...`;
+                }
+            }, 2000);
+        }
+    });
 });
 </script>
 {% endblock %}
