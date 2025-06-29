@@ -136,6 +136,9 @@ class Course(db.Model):
                 completed_steps += 1
 
         progress_percent = int((completed_steps / total_steps) * 100) if total_steps > 0 else 0
+        # Progress yüzdesinin %100'ü aşmamasını garanti et
+        if progress_percent > 100:
+            progress_percent = 100
         is_completed = all_content_completed and (not self.test_required or passed_test)
 
         ProgressDetails = namedtuple('ProgressDetails', [
@@ -203,6 +206,9 @@ class Progress(db.Model):
     completed_at = db.Column(db.DateTime)
     test_score = db.Column(db.Integer)
     test_completed = db.Column(db.Boolean, default=False)
+    
+    # Unique constraint to prevent duplicate progress entries
+    __table_args__ = (db.UniqueConstraint('user_id', 'video_id', name='unique_user_video_progress'),)
 
 class Announcement(db.Model):
     id = db.Column(db.Integer, primary_key=True)

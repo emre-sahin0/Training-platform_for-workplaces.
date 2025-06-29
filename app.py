@@ -150,20 +150,21 @@ def dashboard():
         if selected_course:
             users = selected_course.assigned_users  # SADECE ATANANLAR
             for user in users:
-                # Her video için sadece bir tamamlanma kaydı say
+                # Yeni progress sistemi ile hesapla
+                progress_details = selected_course.get_user_progress(user)
+                
+                # Video sayılarını ayrıca hesapla (eski sistem ile uyumluluk için)
                 video_ids = set(v.id for v in selected_course.videos)
                 completed_videos = len({p.video_id for p in user.progress if p.completed and p.video_id in video_ids})
                 total_videos = len(video_ids)
-                percent = int((completed_videos / total_videos) * 100) if total_videos else 0
-                if percent > 100:
-                    percent = 100
+                
                 user_progress.append({
                     'user': user,
                     'completed_videos': completed_videos,
                     'total_videos': total_videos,
-                    'percent': percent,
-                    'test_score': max((p.test_score for p in user.progress if p.video.course_id == selected_course.id and p.test_score is not None), default=None),
-                    'test_completed': any(p.test_completed for p in user.progress if p.video.course_id == selected_course.id),
+                    'percent': progress_details.progress_percent,  # Düzeltilmiş progress yüzdesi
+                    'test_score': progress_details.test_score,
+                    'test_completed': progress_details.passed_test,
                 })
         return render_template('admin_dashboard.html', courses=courses, selected_course=selected_course, user_progress=user_progress)
     else:
@@ -1449,7 +1450,11 @@ def pdf_test(course_id):
     if last_video:
         existing_progress = Progress.query.filter_by(user_id=current_user.id, video_id=last_video.id).first()
         if existing_progress and existing_progress.test_completed:
-            flash(f'Bu testi daha önce tamamladınız! Sonuç: %{existing_progress.test_score}', 'info')
+            # Test tamamlanmışsa tekrar girişi engelle
+            if existing_progress.test_score >= course.passing_score:
+                flash(f'Bu testi başarıyla tamamladınız! Sonuç: %{existing_progress.test_score} (Geçme notu: %{course.passing_score})', 'success')
+            else:
+                flash(f'Bu testi daha önce tamamladınız! Sonuç: %{existing_progress.test_score} (Geçme notu: %{course.passing_score})', 'warning')
             return redirect(url_for('course', course_id=course_id))
     
     # Test dosyası tipi ve adı
@@ -1464,8 +1469,20 @@ def pdf_test(course_id):
     if not test_file_type or not course.test_question_count or not course.test_answer_key:
         flash('Bu kurs için test tanımlanmamış.')
         return redirect(url_for('course', course_id=course_id))
+    
+    # Tüm içeriğin tamamlanıp tamamlanmadığını kontrol et (GET isteği için)
+    progress_details = course.get_user_progress(current_user)
+    if not progress_details.all_content_completed:
+        flash('Teste geçmek için önce tüm eğitim içeriğini tamamlamalısınız.', 'warning')
+        return redirect(url_for('course', course_id=course_id))
 
     if request.method == 'POST':
+        # Tüm içeriğin tamamlanıp tamamlanmadığını kontrol et
+        progress_details = course.get_user_progress(current_user)
+        if not progress_details.all_content_completed:
+            flash('Teste geçmek için önce tüm eğitim içeriğini tamamlamalısınız.', 'warning')
+            return redirect(url_for('course', course_id=course_id))
+        
         user_answers = []
         for i in range(1, course.test_question_count + 1):
             user_answers.append(request.form.get(f'q{i}', '').upper())
@@ -1481,6 +1498,12 @@ def pdf_test(course_id):
             if not progress:
                 progress = Progress(user_id=current_user.id, video_id=last_video.id)
                 db.session.add(progress)
+            
+            # Test daha önce tamamlanmışsa tekrar kayıt yapma
+            if progress.test_completed:
+                flash('Bu test daha önce tamamlanmış. Aynı test tekrar kaydedilemez.', 'warning')
+                return redirect(url_for('course', course_id=course_id))
+            
             progress.test_score = percent
             progress.test_completed = True  # Test tamamlandı olarak işaretle
             progress.completed_at = datetime.utcnow()
