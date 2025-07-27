@@ -60,7 +60,7 @@
                                         <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-primary">
                                             {% if progress.is_completed %}
                                                 Tekrar Gözat
-                                            {% elif progress.completed_steps > 0 %}
+                                            {% elif progress.progress_percent > 0 %}
                                                 Kursa Devam Et
                                             {% else %}
                                                 Kursa Başla

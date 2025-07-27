@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-hero py-4 px-3 mb-4 rounded-4 text-white" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%);">
+    <h2 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i>Grup Yönetimi</h2>
+</div>
+<div class="mb-4">
+    <form method="POST" action="{{ url_for('admin_groups') }}">
+        <div class="input-group">
+            <input type="text" class="form-control" name="group_name" placeholder="Yeni grup adı" required>
+            <button class="btn btn-primary" type="submit">Grup Ekle</button>
+        </div>
+    </form>
+</div>
+<div class="table-responsive">
+<table class="table table-bordered align-middle shadow-sm bg-white rounded-4">
+    <thead class="table-primary">
+        <tr>
+            <th>ID</th>
+            <th>Grup Adı</th>
+            <th>Kullanıcılar</th>
+            <th>İşlemler</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for group in groups %}
+        <tr>
+            <td data-label="ID">{{ group.id }}</td>
+            <td data-label="Grup Adı">{{ group.name }}</td>
+            <td data-label="Kullanıcılar">
+                {% for user in group.users %}
+                    <span class="badge bg-light text-dark mb-1">{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</span><br>
+                {% else %}
+                    <span class="text-muted">Henüz kullanıcı yok</span>
+                {% endfor %}
+            </td>
+            <td data-label="İşlemler">
+                <form action="{{ url_for('delete_group', group_id=group.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Bu grubu silmek istediğinize emin misiniz?');">
+                    <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+                </form>
+                <a href="{{ url_for('edit_group', group_id=group.id) }}" class="btn btn-warning btn-sm ms-1">Düzenle</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %} 

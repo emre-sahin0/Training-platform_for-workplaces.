@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Video Ekle</h2>
+    <form method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="title" class="form-label">Video Başlığı</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+        </div>
+        <div class="mb-3">
+            <label for="order" class="form-label">Sıra</label>
+            <input type="number" class="form-control" id="order" name="order" value="1" min="1" required>
+        </div>
+        <div class="mb-3">
+            <label for="video_file" class="form-label">Video Dosyası</label>
+            <input type="file" class="form-control" id="video_file" name="video_file" accept="video/*" required>
+        </div>
+        <button type="submit" class="btn btn-success">Ekle</button>
+        <a href="{{ url_for('course.view_course', course_id=course.id) }}" class="btn btn-secondary">İptal</a>
+    </form>
+</div>
+{% endblock %} 

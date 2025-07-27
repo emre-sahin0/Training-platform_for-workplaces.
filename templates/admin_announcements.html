@@ -38,7 +38,7 @@
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <!-- Sil Butonu -->
-                            <form method="post" action="{{ url_for('delete_announcement', ann_id=ann.id) }}" onsubmit="return confirm('Duyuruyu silmek istediğinize emin misiniz?');">
+                            <form method="post" action="{{ url_for('admin.delete_announcement', ann_id=ann.id) }}" onsubmit="return confirm('Duyuruyu silmek istediğinize emin misiniz?');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle d-flex align-items-center justify-content-center" style="width:2.1rem; height:2.1rem;" title="Sil">
                                     <i class="bi bi-trash"></i>
                                 </button>

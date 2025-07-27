@@ -26,21 +26,43 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <!-- Kişi/Grup Seçimi Toggle -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size:1.1rem;">Eğitimi Alacak Kullanıcılar</label>
-                        <div class="list-group user-select-list shadow rounded-4" style="max-height: 250px; overflow-y: auto;">
-                            {% for user in users if not user.is_admin %}
-                            <label class="list-group-item d-flex align-items-center gap-2 user-select-item rounded-3 mb-2" style="cursor:pointer; border: none;">
-                                <input class="form-check-input me-2 big-checkbox" type="checkbox" name="assigned_users" value="{{ user.id }}" onchange="this.parentElement.classList.toggle('selected', this.checked)">
-                                <span class="user-info fw-bold" style="font-size:1.05rem;">
-                                    <i class="bi bi-person-circle me-1"></i>{{ user.first_name }} {{ user.last_name }}
-                                    <span class="badge bg-light text-dark ms-2">{{ user.username }}</span>
-                                </span>
-                            </label>
+                        <label class="form-label">Eğitimi Atama Tipi</label><br>
+                        <input type="radio" id="select_users" name="assign_type" value="users" checked>
+                        <label for="select_users">Kişi Seç</label>
+                        <input type="radio" id="select_groups" name="assign_type" value="groups">
+                        <label for="select_groups">Grup Seç</label>
+                    </div>
+
+                    <!-- Kullanıcı Grubu Seç (sadece grup seçiliyse göster) -->
+                    <div id="group_select_section" style="display:none;">
+                        <label>Kullanıcı Grubu Seç</label>
+                        <div class="group-list">
+                            {% for group in groups %}
+                                <div>
+                                    <input type="checkbox" name="group_ids" value="{{ group.id }}" id="group_{{ group.id }}">
+                                    <label for="group_{{ group.id }}">{{ group.name }}</label>
+                                </div>
                             {% endfor %}
                         </div>
-                        <small class="form-text text-muted">Birden fazla kullanıcı seçebilirsiniz.</small>
+                        <small>Bir veya birden fazla grup seçebilirsiniz. Seçilen gruptaki tüm kullanıcılar kursa atanır.</small>
                     </div>
+
+                    <!-- Eğitimi Alacak Kullanıcılar (sadece kişi seçiliyse göster) -->
+                    <div id="user_select_section">
+                        <label>Eğitimi Alacak Kullanıcılar</label>
+                        <div class="user-list">
+                            {% for user in users %}
+                                <div>
+                                    <input type="checkbox" name="user_ids" value="{{ user.id }}" id="user_{{ user.id }}">
+                                    <label for="user_{{ user.id }}">{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <small>Birden fazla kullanıcı seçebilirsiniz.</small>
+                    </div>
+
                     <div class="mb-4">
                         <label class="form-label fw-bold">Kurs İçeriği</label>
                         <div id="content-inputs" class="mb-3">
@@ -406,6 +428,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     progressText.textContent = `Tahmini süre: ${estimatedSeconds} saniye...`;
                 }
             }, 2000);
+        }
+    });
+
+    // Toggle arayüzü
+    const userRadio = document.getElementById('select_users');
+    const groupRadio = document.getElementById('select_groups');
+    const userSection = document.getElementById('user_select_section');
+    const groupSection = document.getElementById('group_select_section');
+
+    userRadio.addEventListener('change', function() {
+        if (userRadio.checked) {
+            userSection.style.display = '';
+            groupSection.style.display = 'none';
+        }
+    });
+    groupRadio.addEventListener('change', function() {
+        if (groupRadio.checked) {
+            userSection.style.display = 'none';
+            groupSection.style.display = '';
         }
     });
 });

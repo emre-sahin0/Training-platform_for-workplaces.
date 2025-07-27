@@ -1,4 +1,4 @@
-# Occupational Health and Safety Training Platform
+# TRT Eğitim Platformu
 
 This project is a modern web application that enables online delivery of occupational health and safety training. It helps organizations manage and track their workplace safety training programs in a digital environment.
 
@@ -111,3 +111,42 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 ## 📞 Contact
 
 For questions or suggestions, please open an issue or send an email. 
+
+# Production Deployment
+
+## Gunicorn ile Başlatma
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:5000 app:create_app
+```
+
+## Nginx ile Statik Dosya Sunumu
+
+Nginx config örneği:
+
+```
+server {
+    listen 80;
+    server_name senin-domainin.com;
+
+    location /static/ {
+        alias /path/to/your/project/static/;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+## Caching ve Rate Limiting
+- Flask-Caching ve Flask-Limiter ile performans ve güvenlik için önbellekleme ve rate limit desteği eklenmiştir.
+- Redis kurulumu gereklidir.
+
+## Video Streaming
+- Videoları doğrudan Nginx veya CDN üzerinden sunmanız önerilir.
+- Eğer Flask ile sunulacaksa, controllers/video_stream.py dosyasına bakınız. 

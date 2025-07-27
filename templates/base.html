@@ -3,26 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AdaWall Eğitim Platformu</title>
+    <title>TRT Eğitim Platformu</title>
+    
+    <!-- Modern Web Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap and Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20241227">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20241227">
 </head>
-<body style="min-height:100vh; background: linear-gradient(120deg, #f8fafc 0%, #e0eafc 100%);">
+<body >
     <!-- Sade üst navbar -->
-    <nav class="navbar navbar-dark shadow-lg" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%); border-radius:0 0 1.2rem 1.2rem; min-height:85px; padding-top:0.8rem; padding-bottom:0.8rem;">
-        <div class="container-fluid d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
+    <nav class="navbar navbar-dark shadow-lg" style="background: linear-gradient(90deg, #4f8cff 0%, #6a82fb 100%); border-radius:0 0 1.2rem 1.2rem; min-height:95px; padding-top:1rem; padding-bottom:1rem;">
+        <div class="container-fluid" style="display: grid; grid-template-columns: 1fr 2fr 1fr; align-items: center; height: 95px;">
+            <!-- Sol Taraf -->
+            <div class="d-flex align-items-center justify-content-start">
                 {% if current_user.is_authenticated %}
-                    <button class="btn btn-outline-light me-2" id="sidebarToggle" style="font-size:1.4rem;"><i class="bi bi-list"></i></button>
+                    <button class="btn btn-outline-light" id="sidebarToggle" style="font-size:1.6rem; padding: 12px 16px;"><i class="bi bi-list"></i></button>
                 {% endif %}
             </div>
-            <div class="flex-grow-1 d-flex justify-content-center align-items-center" style="min-width:0; height:90px;">
-                <span class="fw-bold d-inline-flex align-items-center justify-content-center mx-auto" style="font-size:1.5rem; letter-spacing:1.1px; color:#fff; text-shadow:0 2px 8px #6a82fb99; font-family:'Segoe UI',Arial,sans-serif;">
-                    <img src="{{ url_for('static', filename='images/adaegitim-logo.png') }}" alt="Ada Eğitim Logo" style="height:8.5rem; margin-right:0; vertical-align:middle; max-width:170px; max-height:170px; object-fit:contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3)); transform: scale(1.1);">
+            
+            <!-- Orta - Logo -->
+            <div class="d-flex justify-content-center align-items-center">
+                <span class="fw-bold d-inline-flex align-items-center justify-content-center" style="font-size:1.6rem; letter-spacing:1.1px; color:#fff; text-shadow:0 3px 10px #6a82fb99; font-family:'Segoe UI',Arial,sans-serif;">
+                    <!-- LOGO: Buraya trt logonuzun yolunu ekleyin -->
+                    <img src="{{ url_for('static', filename='images/trt_logo.png') }}" alt="TRT Eğitim Logo" style="height:75px; margin-right:0; vertical-align:middle; max-width:180px; max-height:90px; object-fit:contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); transition: transform 0.3s ease;">
                 </span>
             </div>
-            <div class="d-flex align-items-center gap-2">
+            
+            <!-- Sağ Taraf -->
+            <div class="d-flex align-items-center justify-content-end gap-2 text-end" style="justify-self: end;">
                 {% if current_user.is_authenticated %}
                     <span class="text-white fw-semibold d-none d-lg-inline">{{ current_user.first_name }} {{ current_user.last_name }}</span>
                     <a class="nav-link nav-glass d-flex align-items-center gap-1" href="{{ url_for('profile') }}"><i class="bi bi-person-circle"></i></a>
@@ -48,7 +63,7 @@
         <!-- Sidebar -->
         {% if current_user.is_authenticated and current_user.is_admin %}
         <nav id="sidebarMenu">
-            <a href="{{ url_for('dashboard') }}" class="sidebar-link">
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="sidebar-link">
                 <i class="bi bi-speedometer2"></i>Panel
             </a>
             <a href="{{ url_for('admin_courses') }}" class="sidebar-link">
@@ -62,6 +77,9 @@
             </a>
             <a href="{{ url_for('admin_users') }}" class="sidebar-link">
                 <i class="bi bi-people"></i>Kullanıcılar
+            </a>
+            <a href="{{ url_for('admin_groups') }}" class="sidebar-link">
+                <i class="bi bi-people-fill"></i>Grup Yönetimi
             </a>
             <a href="{{ url_for('admin_announcements') }}" class="sidebar-link">
                 <i class="bi bi-megaphone"></i>Duyurular

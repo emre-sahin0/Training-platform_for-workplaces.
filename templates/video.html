@@ -14,7 +14,23 @@
             </div>
         </div>
     </div>
-    <div class="col-md-8">
+    
+    <!-- Büyük Aşama Numarası -->
+    <div class="col-md-2 mb-4">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div class="display-1 fw-bold text-primary mb-2">{{ (current_step + 1) if current_step is not none else 1 }}</div>
+                <h6 class="text-muted">Eğitim Durumu</h6>
+                {% if progress and progress.completed %}
+                    <div class="badge bg-success">Tamamlandı</div>
+                {% else %}
+                    <div class="badge bg-warning">Video henüz tamamlanmadı.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
         <div class="card">
             <div class="card-body">
                 <h3 class="card-title">{{ video.title }}</h3>
@@ -130,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Sending completion request to server...');
         
-        fetch('/video/{{ video.id }}/complete', {
+        fetch('/course/complete_video/{{ video.id }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

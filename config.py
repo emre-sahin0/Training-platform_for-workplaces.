@@ -2,34 +2,44 @@ import os
 from datetime import timedelta
 
 class Config:
-    SECRET_KEY = 'your-secret-key-here'
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///isg.db'
+    ENV = os.environ.get('FLASK_ENV', 'production')
+    if ENV == 'development':
+        SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
+    else:
+        SECRET_KEY = os.environ.get('SECRET_KEY')
+        if not SECRET_KEY:
+            raise RuntimeError('SECRET_KEY ortam değişkeni tanımlı değil!')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    UPLOAD_FOLDER = 'static/uploads'
-    MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 500MB max file size
-    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
-    ADMIN_REGISTRATION_KEY = 'admin123'  # Admin kayıt şifresi 
     
-    # --- Performance Ayarları (Hız optimizasyonu) ---
-    SEND_FILE_MAX_AGE_DEFAULT = 86400  # Static file cache (1 gün)
+    # File upload settings
+    MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 500MB
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    
+    # Ensure upload folder exists
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    
+    # Email settings
+    MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
+    MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or 'noreply@trt.com.tr'
+    
+    # SQLAlchemy engine options for performance
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_pre_ping': True,
-        'pool_recycle': 7200,  # 2 saat sonra connection'ları yenile
-        'pool_size': 10,  # Connection pool size (SQLite için uygun)
-        'max_overflow': 0,  # SQLite threading limiti
         'connect_args': {
-            'timeout': 60,  # SQLite timeout (artırıldı)
+            'timeout': 20,
             'check_same_thread': False
         }
     }
     
-    # --- Request Timeout Ayarları ---
-    TIMEOUT = 600  # 10 dakika request timeout (büyük dosyalar için)
+    # Session configuration
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=2)
     
-    # --- Güvenlik Ayarları ---
-    WTF_CSRF_ENABLED = True
-    SESSION_COOKIE_SECURE = True  # Sadece HTTPS üzerinden iletilsin
-    SESSION_COOKIE_HTTPONLY = True  # JS erişemesin
-    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF'ye karşı ek koruma
-    DEBUG = True  # Debug açık (test için)
-    # Canlıda mutlaka uzun ve rastgele bir SECRET_KEY kullanın! 
+    # Request timeout
+    TIMEOUT = 600  # 10 minutes
+    
+    # Debug mode
+    DEBUG = True 

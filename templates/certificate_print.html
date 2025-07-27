@@ -122,8 +122,9 @@
         </div>
     {% else %}
         <div class="adawall-header">
-            <img src="{{ url_for('static', filename='images/ada.jpeg') }}" alt="Adawall Logo" class="adawall-logo">
-            <div class="adawall-title">Adawall Eğitim Platformu</div>
+            <!-- LOGO: Buraya trt logonuzun yolunu ekleyin -->
+            <img src="{{ url_for('static', filename='images/trt_logo.png') }}" alt="TRT Logo" class="adawall-logo">
+            <div class="adawall-title">TRT Eğitim Platformu</div>
         </div>
         <div class="certificate-title">
             {% if certificate.certificate_type.category.name == 'İş Sağlığı ve Güvenliği' %}
@@ -170,7 +171,7 @@
         <div class="certificate-footer">
             <div>
                 <strong>Belge Numarası:</strong> {{ certificate.certificate_number }}<br>
-                <strong>Veriliş Tarihi:</strong> {{ certificate.issue_date.strftime('%d.%m.%Y') }}
+                <strong>Veriliş Tarihi:</strong> {{ certificate.issued_at.strftime('%d.%m.%Y') }}
             </div>
         </div>
     {% endif %}

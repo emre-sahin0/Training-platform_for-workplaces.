@@ -21,7 +21,7 @@
                     <td>{{ certificate.user.first_name }} {{ certificate.user.last_name }}</td>
                     <td>{{ certificate.certificate_type.name }}</td>
                     <td>{{ certificate.certificate_type.category.name }}</td>
-                    <td>{{ certificate.issue_date.strftime('%d.%m.%Y') }}</td>
+                    <td>{{ certificate.issued_at.strftime('%d.%m.%Y') }}</td>
                     <td>{{ certificate.certificate_number }}</td>
                     <td>
                         <a href="{{ url_for('view_certificate', certificate_id=certificate.id) }}" class="btn btn-sm btn-primary" target="_blank">Görüntüle</a>

@@ -14,54 +14,104 @@
             </div>
         </div>
     </div>
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body p-0" style="height: 70vh;">
-                <iframe src="{{ url_for('static', filename='uploads/' + pdf.pdf_path) }}" width="100%" height="100%" frameborder="0">
-                    Bu tarayıcı PDF'leri desteklemiyor. PDF'i <a href="{{ url_for('static', filename='uploads/' + pdf.pdf_path) }}">buradan</a> indirebilirsiniz.
-                </iframe>
+    
+    <!-- Büyük Aşama Numarası -->
+    <div class="col-md-2 mb-4">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div class="display-1 fw-bold text-primary mb-2">{{ (current_step + 1) if current_step is not none else 1 }}</div>
+                <h6 class="text-muted">PDF Durumu</h6>
+                {% if pdf_progress %}
+                    <div class="badge bg-success">Görüntülendi</div>
+                {% else %}
+                    <div class="badge bg-info">PDF açıldı</div>
+                {% endif %}
             </div>
         </div>
     </div>
     
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">{{ pdf.title }}</h3>
+                <iframe src="{{ url_for('static', filename='uploads/' + pdf.pdf_path) }}" width="100%" height="600px" style="border: 1px solid #ddd;">
+                    Tarayıcınız PDF görüntülemeyi desteklemiyor.
+                </iframe>
+            </div>
+        </div>
+    </div>
     <div class="col-md-4">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">{{ pdf.title }}</h5>
-                <div class="alert alert-info">
-                    <i class="fas fa-file-pdf"></i> PDF materyali görüntüleniyor
-                </div>
+                <h5 class="card-title">PDF Durumu</h5>
+                {% if pdf_progress %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Bu PDF görüntülendi!
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-file-pdf"></i> PDF açıldı.
+                    </div>
+                {% endif %}
                 
-                <!-- Ana Aksiyon Butonu -->
-                {% if next_url %}
-                    {% if 'pdf-test' in next_url %}
-                        <a href="{{ next_url }}" class="btn btn-warning btn-lg w-100 mb-3">
-                            <i class="fas fa-clipboard-check"></i> Kursu Bitirme Testine Git
-                        </a>
+                <div class="d-grid gap-2">
+                    {% if next_url %}
+                        {% if 'pdf-test' in next_url %}
+                            <a href="{{ next_url }}" class="btn btn-warning btn-lg">
+                                <i class="fas fa-clipboard-check"></i> Kursu Bitirme Testine Git
+                            </a>
+                        {% else %}
+                            <a href="{{ next_url }}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-arrow-right"></i> Sonraki Adıma Geç
+                            </a>
+                        {% endif %}
                     {% else %}
-                        <a href="{{ next_url }}" class="btn btn-primary btn-lg w-100 mb-3">
-                            <i class="fas fa-arrow-right"></i> Sonraki Adıma Geç
+                        <!-- Kurs tamamlandıysa dashboard'a git -->
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-lg">
+                            <i class="fas fa-trophy"></i> Ana Sayfaya Git
                         </a>
                     {% endif %}
-                {% else %}
-                    <!-- Kurs tamamlandıysa dashboard'a git -->
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-lg w-100 mb-3">
-                        <i class="fas fa-trophy"></i> Ana Sayfaya Git
+                    
+                    {% if prev_url %}
+                        <a href="{{ prev_url }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Önceki İçeriğe Git
+                        </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-outline-info">
+                        <i class="fas fa-book"></i> Kurs Sayfasına Dön
                     </a>
-                {% endif %}
+                </div>
                 
-                <!-- Sadece Önceki butonu (eğer varsa) -->
-                {% if prev_url %}
-                    <a href="{{ prev_url }}" class="btn btn-outline-secondary w-100 mb-3">
-                        <i class="fas fa-arrow-left"></i> Önceki İçeriğe Git
-                    </a>
-                {% endif %}
-                
-                <a href="{{ url_for('course', course_id=course.id) }}" class="btn btn-outline-info w-100">
-                    <i class="fas fa-book"></i> Kurs Sayfasına Dön
-                </a>
+                <div class="alert alert-info mt-3">
+                    <small><i class="fas fa-info-circle"></i> PDF'i inceleyin, ardından sonraki adıma geçebilirsiniz.</small>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // PDF açıldığında otomatik olarak "görüntülendi" olarak işaretle
+    {% if not pdf_progress %}
+    fetch('/course/mark_pdf_viewed/{{ pdf.id }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('PDF viewed status updated');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating PDF view status:', error);
+    });
+    {% endif %}
+});
+</script>
 {% endblock %} 

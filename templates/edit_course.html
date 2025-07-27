@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Kursu Düzenle</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="title" class="form-label">Kurs Başlığı</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ course.title }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Kurs Açıklaması</label>
+            <textarea class="form-control" id="description" name="description" rows="3">{{ course.description }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="category_id" class="form-label">Kategori</label>
+            <select class="form-control" id="category_id" name="category_id" required>
+                {% for category in categories %}
+                    <option value="{{ category.id }}" {% if course.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Eğitimi Atama Tipi</label><br>
+            <input type="radio" id="select_users" name="assign_type" value="users" {% if course.assigned_users and (course.assigned_users|length > 0) %}checked{% endif %}>
+            <label for="select_users">Kişi Seç</label>
+            <input type="radio" id="select_groups" name="assign_type" value="groups" {% if not course.assigned_users or (course.assigned_users|length == 0) %}checked{% endif %}>
+            <label for="select_groups">Grup Seç</label>
+        </div>
+        <div id="group_select_section" style="display:none;">
+            <label>Kullanıcı Grubu Seç</label>
+            <div class="group-list">
+                {% for group in groups %}
+                    <div>
+                        <input type="checkbox" name="group_ids" value="{{ group.id }}" id="group_{{ group.id }}">
+                        <label for="group_{{ group.id }}">{{ group.name }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+            <small>Bir veya birden fazla grup seçebilirsiniz. Seçilen gruptaki tüm kullanıcılar kursa atanır.</small>
+        </div>
+        <div id="user_select_section">
+            <label>Eğitimi Alacak Kullanıcılar</label>
+            <div class="user-list">
+                {% for user in users %}
+                    <div>
+                        <input type="checkbox" name="user_ids" value="{{ user.id }}" id="user_{{ user.id }}" {% if user in course.assigned_users %}checked{% endif %}>
+                        <label for="user_{{ user.id }}">{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</label>
+                    </div>
+                {% endfor %}
+            </div>
+            <small>Birden fazla kullanıcı seçebilirsiniz.</small>
+        </div>
+        <button type="submit" class="btn btn-success mt-3">Kaydet</button>
+        <a href="{{ url_for('course.view_course', course_id=course.id) }}" class="btn btn-secondary mt-3">İptal</a>
+    </form>
+</div>
+<script>
+// Toggle arayüzü
+const userRadio = document.getElementById('select_users');
+const groupRadio = document.getElementById('select_groups');
+const userSection = document.getElementById('user_select_section');
+const groupSection = document.getElementById('group_select_section');
+
+function toggleSections() {
+    if (userRadio.checked) {
+        userSection.style.display = '';
+        groupSection.style.display = 'none';
+    } else {
+        userSection.style.display = 'none';
+        groupSection.style.display = '';
+    }
+}
+userRadio.addEventListener('change', toggleSections);
+groupRadio.addEventListener('change', toggleSections);
+document.addEventListener('DOMContentLoaded', toggleSections);
+</script>
+{% endblock %} 

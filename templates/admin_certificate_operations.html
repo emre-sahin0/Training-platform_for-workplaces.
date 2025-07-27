@@ -46,7 +46,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if item.progress.is_completed %}
+                                {% if (selected_course.test_required and item.progress.passed_test) or (not selected_course.test_required and item.progress.all_content_completed) %}
                                     <span class="badge bg-success">Geçti</span>
                                 {% else %}
                                     <span class="badge bg-danger">Kaldı</span>
@@ -81,7 +81,7 @@
             <input type="file" class="form-control" name="certificate_file" accept="application/pdf,image/*">
             <small class="form-text text-muted">Eğer dosya yüklemezseniz, sistem otomatik olarak standart bir sertifika şablonu oluşturacaktır.</small>
         </div>
-        <button type="submit" class="btn btn-success" {% if not eligible_users or not filtered_types %}disabled{% endif %}>Sertifika Ata</button>
+        <button type="submit" class="btn btn-success">Sertifika Ata</button>
     </form>
     {% endif %}
 </div>

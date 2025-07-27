@@ -10,14 +10,27 @@
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">{{ certificate.certificate_type.name }}</h5>
+                    <h5 class="card-title mb-0">
+                      {% if certificate.certificate_type %}
+                        {{ certificate.certificate_type.name }}
+                        <br>
+                        <strong>Kategori:</strong> {{ certificate.certificate_type.category.name }}
+                      {% else %}
+                        Otomatik Sertifika<br>
+                        <strong>Kategori:</strong> Kategori Yok
+                      {% endif %}
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
                         <strong>Belge Numarası:</strong> {{ certificate.certificate_number }}<br>
-                        <strong>Kategori:</strong> {{ certificate.certificate_type.category.name }}<br>
-                        <strong>Veriliş Tarihi:</strong> {{ certificate.issue_date.strftime('%d.%m.%Y') }}<br>
+                        <strong>Veriliş Tarihi:</strong> {{ certificate.issued_at.strftime('%d.%m.%Y') if certificate.issued_at else '' }}<br>
                         <strong>Tamamlanan Kurslar:</strong>
+                        {% if certificate.course %}
+                            {{ certificate.course.title }}
+                        {% else %}
+                            Bilgi Yok
+                        {% endif %}
                     </p>
                     <ul class="list-group list-group-flush">
                         {% for course in certificate.courses %}
@@ -26,8 +39,8 @@
                     </ul>
                 </div>
                 <div class="card-footer text-end">
-                    <a href="{{ url_for('download_certificate_pdf', certificate_id=certificate.id) }}" class="btn btn-primary">
-                        <i class="bi bi-file-earmark-pdf"></i> PDF İndir
+                    <a href="{{ url_for('user.download_certificate', certificate_id=certificate.id) }}" class="btn btn-primary">
+                        <i class="bi bi-download"></i> PDF İndir
                     </a>
                     
                     {% if certificate.certificate_file %}

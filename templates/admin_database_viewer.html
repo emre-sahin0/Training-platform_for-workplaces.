@@ -96,7 +96,7 @@
                             <td>{{ cert.certificate_type.name }}</td>
                             <td>{{ cert.certificate_number }}</td>
                             <td>{{ cert.certificate_file }}</td>
-                            <td>{{ cert.issue_date.strftime('%d.%m.%Y %H:%M') if cert.issue_date else '-' }}</td>
+                            <td>{{ cert.issued_at.strftime('%d.%m.%Y %H:%M') if cert.issued_at else '-' }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -57,7 +57,7 @@
                     <h5 class="card-title mb-0">Hesap Ayarları</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('delete_account') }}" method="POST" onsubmit="return confirm('Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!');">
+                    <form method="post" action="{{ url_for('user.delete_account') }}" onsubmit="return confirm('Hesabınızı ve tüm verilerinizi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!');">
                         <button type="submit" class="btn btn-danger">Hesabımı Sil</button>
                     </form>
                 </div>

@@ -16,15 +16,66 @@
                         <i class="fas fa-home"></i> Ana Sayfaya Git
                     </a>
                 {% else %}
-                    <a href="{{ start_url }}" class="btn btn-primary btn-lg start-education-btn">
-                        <i class="fas fa-play-circle"></i> {{ button_text }}
-                    </a>
+                    {% if course.videos|length > 0 %}
+                        <a href="{{ url_for('course.video', video_id=course.videos[0].id) }}" class="btn btn-primary btn-lg" style="border-radius: 2rem; min-width: 100px; min-height: 50px; font-size: 1.5rem;">
+                            Kursa Başla
+                        </a>
+                    {% else %}
+                        <button class="btn btn-primary btn-lg" style="border-radius: 2rem; min-width: 100px; min-height: 50px; font-size: 1.5rem;" disabled>
+                            İçerik Eklenmedi
+                        </button>
+                    {% endif %}
                 {% endif %}
                 
             </div>
         </div>
     </div>
 </div>
+
+{% if current_user.is_admin %}
+<div class="mb-3 d-flex gap-2">
+    <a href="{{ url_for('course.edit_course', course_id=course.id) }}" class="btn btn-warning">Kursu Düzenle</a>
+    <form method="post" action="{{ url_for('course.delete_course', course_id=course.id) }}" onsubmit="return confirm('Kursu silmek istediğinize emin misiniz? Bu işlem geri alınamaz!');">
+        <button type="submit" class="btn btn-danger">Kursu Sil</button>
+    </form>
+    <a href="{{ url_for('course.add_video', course_id=course.id) }}" class="btn btn-success">Video Ekle</a>
+    <!-- Test Ekle butonu ileride eklenecek -->
+</div>
+{% endif %}
+
+<!-- Kurs Videoları -->
+{% if videos %}
+<h4>Kurs Videoları</h4>
+<ul>
+    {% for video in videos %}
+    <li>{{ video.title }} ({{ video.video_path }})</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if current_user.is_admin and user_progress_list %}
+<h3>Kursa Atanmış Kullanıcılar</h3>
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Kullanıcı</th>
+      <th>İlerleme (%)</th>
+      <th>Test Skoru</th>
+      <th>Tamamladı mı?</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in user_progress_list %}
+    <tr>
+      <td>{{ item.user.first_name }} {{ item.user.last_name }} ({{ item.user.username }})</td>
+      <td>{{ item.progress.progress_percent|round(1) }}</td>
+      <td>{% if item.progress.test_score is not none %}{{ item.progress.test_score }}{% else %}-{% endif %}</td>
+      <td>{% if item.progress.all_content_completed %}Evet{% else %}Hayır{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 
 <style>
     .course-landing-card {

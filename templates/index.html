@@ -1,55 +1,152 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 text-center">
-        <h3 class="mb-3" style="font-weight:600; color:#4f8cff; letter-spacing:1px;">ADAWALL Eğitim Platformu</h3>
-        <p class="lead mb-2">
-            Bu platformda <b>İş Sağlığı ve Güvenliği</b>, <b>Mağaza Eğitimleri</b> ve <b>Genel Eğitimler</b> düzenlenecektir.
-        </p>
-        <p class="mb-4">
-            Tüm eğitimlerinizi online olarak tamamlayabilir, video eğitimler ve testlerle bilginizi pekiştirebilir, ilerlemenizi kolayca takip edebilirsiniz.
-        </p>
-        {% if not current_user.is_authenticated %}
-            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg me-2">Giriş Yap</a>
-            <a href="{{ url_for('register') }}" class="btn btn-outline-primary btn-lg">Kayıt Ol</a>
-        {% else %}
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">Panele Git</a>
-        {% endif %}
+<div class="container-fluid p-0">
+    <!-- Modern Hero Section -->
+    <div class="modern-hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="hero-badge-text">✨ Yeni Nesil Eğitim Platformu</span>
+            </div>
+            
+            <h1 class="hero-title">
+                <span class="gradient-text">TRT</span><br>
+                Eğitim Platformu
+            </h1>
+            
+            <p class="hero-subtitle">
+                İş Sağlığı ve Güvenliği, Mağaza Eğitimleri ve Genel Eğitimler için
+                <span class="highlight">gelişmiş online eğitim deneyimi</span>
+            </p>
+            
+            <p class="hero-description">
+                📚 Video eğitimler • 🎯 Online testler • 📈 İlerleme takibi • 🏆 Sertifikalar
+            </p>
+            
+            <div class="hero-buttons">
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('login') }}" class="modern-btn primary-btn">
+                        <span class="btn-text">Giriş Yap</span>
+                        <span class="btn-icon">→</span>
+                    </a>
+                    <a href="{{ url_for('register') }}" class="modern-btn secondary-btn">
+                        <span class="btn-text">Kayıt Ol</span>
+                        <span class="btn-icon">✨</span>
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('dashboard') }}" class="modern-btn primary-btn">
+                        <span class="btn-text">Panele Git</span>
+                        <span class="btn-icon">🚀</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Floating Elements -->
+        <div class="floating-elements">
+            <div class="floating-circle circle-1"></div>
+            <div class="floating-circle circle-2"></div>
+            <div class="floating-circle circle-3"></div>
+        </div>
     </div>
-</div>
 
-<div class="row mt-5">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body text-center">
-                <h3 class="card-title">Video Eğitimler</h3>
-                <p class="card-text">
-                    Uzman eğitmenler tarafından hazırlanan video eğitimler ile
-                    iş sağlığı ve güvenliği konularında kendinizi geliştirin.
-                </p>
+    <!-- Modern Features Section -->
+    <div class="features-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Platform Özellikleri</h2>
+                <p class="section-subtitle">Modern teknolojilerle desteklenen eğitim deneyimi</p>
+            </div>
+            
+            <div class="row features-grid">
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                        <div class="feature-icon">
+                            <div class="icon-wrapper video-icon">
+                                🎬
+                            </div>
+                        </div>
+                        <h3 class="feature-title">Video Eğitimler</h3>
+                        <p class="feature-description">
+                            Uzman eğitmenler tarafından hazırlanan interaktif video eğitimler ile 
+                            iş sağlığı ve güvenliği konularında kendinizi geliştirin.
+                        </p>
+                        <div class="feature-stats">
+                            <span class="stat">HD Kalite</span>
+                            <span class="stat">Mobil Uyumlu</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                        <div class="feature-icon">
+                            <div class="icon-wrapper test-icon">
+                                🎯
+                            </div>
+                        </div>
+                        <h3 class="feature-title">Online Testler</h3>
+                        <p class="feature-description">
+                            Her eğitimin sonunda bilgilerinizi test edin, anlık geri bildirim alın ve
+                            başarı durumunuzu detaylı raporlarla takip edin.
+                        </p>
+                        <div class="feature-stats">
+                            <span class="stat">Anlık Sonuç</span>
+                            <span class="stat">Detaylı Rapor</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
+                        <div class="feature-icon">
+                            <div class="icon-wrapper progress-icon">
+                                📈
+                            </div>
+                        </div>
+                        <h3 class="feature-title">İlerleme Takibi</h3>
+                        <p class="feature-description">
+                            Gelişmiş analitik paneli ile eğitim sürecinizi takip edin,
+                            hedeflerinizi belirleyin ve başarılarınızı kutlayın.
+                        </p>
+                        <div class="feature-stats">
+                            <span class="stat">Analitik Panel</span>
+                            <span class="stat">Hedef Takibi</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body text-center">
-                <h3 class="card-title">Online Testler</h3>
-                <p class="card-text">
-                    Her eğitimin sonunda bilgilerinizi test edin ve
-                    başarı durumunuzu takip edin.
-                </p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body text-center">
-                <h3 class="card-title">İlerleme Takibi</h3>
-                <p class="card-text">
-                    Eğitimlerinizdeki ilerlemenizi takip edin ve
-                    tamamladığınız eğitimleri görüntüleyin.
-                </p>
+
+    <!-- Modern Stats Section -->
+    <div class="stats-section">
+        <div class="container">
+            <div class="row text-center">
+                <div class="col-md-3 col-6">
+                    <div class="stat-card">
+                        <div class="stat-number" data-count="100">0</div>
+                        <div class="stat-label">Aktif Kullanıcı</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-card">
+                        <div class="stat-number" data-count="50">0</div>
+                        <div class="stat-label">Eğitim Modülü</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-card">
+                        <div class="stat-number" data-count="95">0</div>
+                        <div class="stat-label">Başarı Oranı</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-card">
+                        <div class="stat-number" data-count="24">0</div>
+                        <div class="stat-label">7/24 Destek</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
